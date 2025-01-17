@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -23,16 +24,20 @@ var RootCmd = &cobra.Command{
 	Short: "Monit Exporter for Prometheus",
 	Long:  "Prometheus Exporter that collects Monit status information and exposes metrics.",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		logrus.Debug("RootCmd is running without subcommand, displaying help message")
 		return cmd.Help()
 	},
 }
 
 // Execute runs the root command of the application.
 func Execute() {
+	logrus.Debug("Execute function called: attempting to run RootCmd.Execute()")
 	if err := RootCmd.Execute(); err != nil {
+		logrus.Errorf("Error occurred while executing RootCmd: %v", err)
 		fmt.Println(err)
 		os.Exit(1)
 	}
+	logrus.Debug("Execute function finished: RootCmd.Execute() completed successfully")
 }
 
 func init() {
@@ -40,7 +45,7 @@ func init() {
 		&listenAddress,
 		"listen-address",
 		"localhost:9388",
-		"The address on which the exporter.go will listen (e.g., '0.0.0.0:9388').",
+		"The address on which the exporter will listen (e.g., '0.0.0.0:9388').",
 	)
 	RootCmd.PersistentFlags().StringVar(
 		&metricsPath,

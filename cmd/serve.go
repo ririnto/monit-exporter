@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -23,10 +24,13 @@ var serveCmd = &cobra.Command{
 	Short: "Run the Monit Exporter server",
 	Long:  "Run the Monit Exporter server that collects Monit status and exposes Prometheus metrics.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Initialize logger
+		logrus.Debug("serveCmd invoked: starting Monit Exporter server")
+
 		if err := config.SetLogLevel(logLevel); err != nil {
+			logrus.Errorf("Failed to set log level: %v", err)
 			return fmt.Errorf("failed to set log level: %w", err)
 		}
+		logrus.Debugf("Log level set to '%s'", logLevel)
 
 		cfg := &config.Config{
 			ListenAddress:  listenAddress,
@@ -37,18 +41,20 @@ var serveCmd = &cobra.Command{
 			MonitPassword:  monitPassword,
 			LogLevel:       logLevel,
 		}
+		logrus.Debugf("Server configuration loaded: %+v", cfg)
 
 		exp, err := exporter.NewExporter(cfg)
 		if err != nil {
+			logrus.Errorf("Failed to create exporter: %v", err)
 			return fmt.Errorf("failed to create exporter: %w", err)
 		}
-
-		// Register the exporter with Prometheus
+		logrus.Debug("Registering exporter to Prometheus")
 		prometheus.MustRegister(exp)
 
 		mux := http.NewServeMux()
 		mux.Handle(cfg.MetricsPath, commonLogHandler(promhttp.Handler()))
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			logrus.Debugf("Root path request received from %s", r.RemoteAddr)
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			_, _ = fmt.Fprintf(
 				w,
@@ -68,22 +74,23 @@ var serveCmd = &cobra.Command{
 			Handler: mux,
 		}
 
-		// Graceful shutdown setup
 		shutdownCh := make(chan os.Signal, 1)
 		signal.Notify(shutdownCh, os.Interrupt, syscall.SIGTERM)
 		go func() {
-			<-shutdownCh
-			logrus.Info("Received shutdown signal, stopping Monit Exporter...")
-
+			sig := <-shutdownCh
+			logrus.Infof("Received shutdown signal: %v. Attempting to stop Monit Exporter gracefully...", sig)
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if err := server.Shutdown(ctx); err != nil {
-				logrus.Errorf("Failed to gracefully shutdown: %v", err)
+				logrus.Errorf("Graceful shutdown failed: %v", err)
+			} else {
+				logrus.Info("Server shut down gracefully")
 			}
 		}()
 
 		logrus.Infof("Starting Monit Exporter on %s", cfg.ListenAddress)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logrus.Errorf("Failed to start server: %v", err)
 			return fmt.Errorf("failed to start server: %w", err)
 		}
 		logrus.Info("Monit Exporter stopped")
@@ -130,7 +137,7 @@ func commonLogHandler(next http.Handler) http.Handler {
 		lrw := NewLoggingResponseWriter(w)
 		next.ServeHTTP(lrw, r)
 		duration := time.Since(start)
-		logrus.Infof("%s - - [%s] \"%s %s %s\" %d %d \"%s\" \"%s\" %.4f",
+		logrus.Infof("[commonLogHandler] %s - - [%s] \"%s %s %s\" %d %d \"%s\" \"%s\" %.4f",
 			r.RemoteAddr,
 			start.Format("02/Jan/2006:15:04:05 -0700"),
 			r.Method,
@@ -142,5 +149,6 @@ func commonLogHandler(next http.Handler) http.Handler {
 			r.UserAgent(),
 			duration.Seconds(),
 		)
+		logrus.Debugf("[commonLogHandler] Request processed: Method=%s, URI=%s, Duration=%.4fs", r.Method, r.RequestURI, duration.Seconds())
 	})
 }
