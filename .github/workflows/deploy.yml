@@ -1,0 +1,45 @@
+name: Go Monit Exporter Deployment
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        goos: [ linux, darwin, windows ]
+        goarch: [ amd64, arm64 ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.23.5
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          mkdir -p build
+          if [ "${GOOS}" = "windows" ]; then
+            BINARY_NAME=monit_exporter-${GOOS}-${GOARCH}.exe
+          else
+            BINARY_NAME=monit_exporter-${GOOS}-${GOARCH}
+          fi
+          CGO_ENABLED=0 go build -ldflags="-s -w" -o build/${BINARY_NAME}
+
+      - name: Upload binaries to GitHub Releases
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/monit_exporter-*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
