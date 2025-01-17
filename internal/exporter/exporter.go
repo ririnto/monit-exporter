@@ -15,15 +15,15 @@ const (
 
 // serviceTypes maps Monit service type integers to descriptive strings.
 var serviceTypes = map[int]string{
-	0: "filesystem",
-	1: "directory",
-	2: "file",
-	3: "program_with_pidfile",
-	4: "remote_host",
-	5: "system",
-	6: "fifo",
-	7: "program_with_path",
-	8: "network",
+	0: "Filesystem",
+	1: "Directory",
+	2: "File",
+	3: "Process",
+	4: "Remote host",
+	5: "System",
+	6: "Fifo",
+	7: "Program",
+	8: "Network",
 }
 
 // Exporter collects Monit metrics and exposes them to Prometheus.
