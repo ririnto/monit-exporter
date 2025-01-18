@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/ririnto/monit_exporter/internal/config"
+	"github.com/ririnto/monit-exporter/internal/config"
 	"github.com/sirupsen/logrus"
 )
 

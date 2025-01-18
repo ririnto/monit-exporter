@@ -1,4 +1,4 @@
-module github.com/ririnto/monit_exporter
+module github.com/ririnto/monit-exporter
 
 go 1.23.5
 

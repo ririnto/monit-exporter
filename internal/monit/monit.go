@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ririnto/monit_exporter/internal/config"
+	"github.com/ririnto/monit-exporter/internal/config"
 	"github.com/sirupsen/logrus"
 )
 
