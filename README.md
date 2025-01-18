@@ -6,22 +6,25 @@
 
 ### Introduction
 
-Monit Exporter is a Prometheus Exporter that scrapes Monit status in XML format, then exposes the metrics via an HTTP
-endpoint. It uses [Cobra](https://github.com/spf13/cobra) for the command-line interface and logs HTTP requests in
-Common Log Format (CLF).
+Monit Exporter is a Prometheus Exporter 
+that scrapes Monit status in XML format and exposes the metrics via an HTTP endpoint.
 
 ### Features
 
-- Scrapes Monit status periodically
-- Exposes Prometheus-compatible metrics
-- CLI integration with Cobra
-- Logs HTTP requests in CLF
-- Fully configurable via command-line flags
+- **Enhanced Logging:**
+    - Detailed logs provide insights into HTTP requests, metric collection processes, and potential issues.
+
+- **Exposes Prometheus-Compatible Metrics:**
+    - Seamlessly integrates with Prometheus for monitoring Monit-managed services.
+
+- **Fully Configurable via Command-Line Flags:**
+    - Customize exporter behavior and Monit scraping parameters as needed.
 
 ### Installation
 
-1. Install [Go](https://golang.org/dl/) (version 1.16 or higher recommended).
-2. Clone the repository and build:
+1. **Install [Go](https://golang.org/dl/) (version 1.16 or higher recommended).**
+
+2. **Clone the repository and build:**
 
     ```bash
     git clone https://github.com/yourusername/monit_exporter.git
@@ -39,17 +42,17 @@ Common Log Format (CLF).
 
 Below is an overview of the flags defined in `cmd/root.go`:
 
-| Flag               | Default                                               | Description                                                              |
-|--------------------|-------------------------------------------------------|--------------------------------------------------------------------------|
-| `listen-address`   | `localhost:9388`                                      | The address on which the exporter.go will listen (e.g., '0.0.0.0:9388'). |
-| `metrics-path`     | `/metrics`                                            | The HTTP path at which metrics are served (e.g., '/metrics').            |
-| `ignore-ssl`       | `false`                                               | Whether to skip SSL certificate verification for Monit endpoints.        |
-| `monit-scrape-uri` | `http://localhost:2812/_status?format=xml&level=full` | The Monit status URL to scrape (XML format).                             |
-| `monit-user`       | *(empty)*                                             | Basic auth username for accessing Monit.                                 |
-| `monit-password`   | *(empty)*                                             | Basic auth password for accessing Monit.                                 |
-| `log-level`        | `info`                                                | Log level for the application (debug, info, warn, error, fatal, panic).  |
+| Flag               | Default                                               | Description                                                             |
+|--------------------|-------------------------------------------------------|-------------------------------------------------------------------------|
+| `listen-address`   | `localhost:9388`                                      | The address on which the exporter will listen (e.g., '0.0.0.0:9388').   |
+| `metrics-path`     | `/metrics`                                            | The HTTP path at which metrics are served (e.g., '/metrics').           |
+| `ignore-ssl`       | `false`                                               | Whether to skip SSL certificate verification for Monit endpoints.       |
+| `monit-scrape-uri` | `http://localhost:2812/_status?format=xml&level=full` | The Monit status URL to scrape (XML format).                            |
+| `monit-user`       | *(empty)*                                             | Basic auth username for accessing Monit.                                |
+| `monit-password`   | *(empty)*                                             | Basic auth password for accessing Monit.                                |
+| `log-level`        | `info`                                                | Log level for the application (debug, info, warn, error, fatal, panic). |
 
-Launch the exporter with desired flags:
+**Launch the exporter with desired flags:**
 
 ```bash
 ./monit_exporter serve \
@@ -60,11 +63,22 @@ Launch the exporter with desired flags:
   --log-level="info"
 ```
 
-Visit the metrics endpoint:
+**Visit the metrics endpoint:**
 
 ```bash
 curl http://localhost:9388/metrics
 ```
+
+### Running Tests
+
+To run the unit tests for the exporter and Monit components:
+
+```bash
+go test ./internal/exporter -v
+go test ./internal/monit -v
+```
+
+Ensure that all tests pass to verify the integrity of the exporter before deployment.
 
 ### Project / Package Structure
 
@@ -80,34 +94,39 @@ curl http://localhost:9388/metrics
 │   │   └── exporter.go (Implements the Prometheus Exporter logic)
 │   └── monit
 │       └── monit.go    (Fetches and parses Monit status data)
-└── main.go             (Entrypoint: calls cmd.Execute())
+├── main.go             (Entrypoint: calls cmd.Execute())
+├── README.md           (This file)
+├── LICENSE             (MIT License)
+├── exporter_test.go    (Unit tests for exporter.go)
+└── monit_test.go       (Unit tests for monit.go)
 ```
 
 ### License
 
 This project is licensed under the [MIT License](LICENSE).
 
----
-
 ## 한국어
 
-### 개요
+### 소개
 
-Monit Exporter는 Monit 상태 정보를 XML 형식으로 수집하고, 이를 Prometheus 메트릭으로 변환하여 HTTP 엔드포인트로 노출하는
-Exporter입니다. [Cobra](https://github.com/spf13/cobra)를 사용하여 CLI를 제공하며, HTTP 요청을 Common Log Format(CLF)으로 로깅합니다.
+Monit Exporter는 Monit 상태 정보를 XML 형식으로 수집하고 이를 Prometheus 메트릭으로 변환하여 HTTP 엔드포인트로 노출하는 익스포터입니다.
 
 ### 기능
 
-- 주기적으로 Monit 상태를 스크랩
-- Prometheus 호환 형식으로 메트릭 노출
-- Cobra 기반 CLI
-- Common Log Format 로깅
-- 커맨드 라인 플래그로 모든 설정 가능
+- **향상된 로깅:**
+    - 자세한 로그를 통해 HTTP 요청, 메트릭 수집 과정 및 잠재적인 문제를 파악할 수 있습니다.
+
+- **Prometheus 호환 메트릭 제공:**
+    - Monit에서 관리하는 서비스를 Prometheus와 원활히 통합하여 모니터링할 수 있습니다.
+
+- **커맨드라인 플래그로 완벽히 구성 가능:**
+    - 익스포터의 동작과 Monit 스크래핑 매개변수를 필요에 따라 사용자 정의할 수 있습니다.
 
 ### 설치
 
-1. [Go](https://golang.org/dl/) (버전 1.16 이상 권장)을 설치합니다.
-2. 저장소를 클론하고 빌드합니다:
+1. **[Go](https://golang.org/dl/) (버전 1.16 이상 권장)을 설치합니다.**
+
+2. **레포지토리를 클론하고 빌드합니다:**
 
     ```bash
     git clone https://github.com/yourusername/monit_exporter.git
@@ -123,19 +142,19 @@ Exporter입니다. [Cobra](https://github.com/spf13/cobra)를 사용하여 CLI�
 
 #### 플래그
 
-`cmd/root.go`에서 정의된 플래그는 다음 표와 같습니다:
+`cmd/root.go`에 정의된 플래그는 다음과 같습니다:
 
-| Flag               | 기본값                                                   | 설명                                                     |
-|--------------------|-------------------------------------------------------|--------------------------------------------------------|
-| `listen-address`   | `localhost:9388`                                      | Exporter가 수신할 주소 및 포트 (예: `0.0.0.0:9388`)              |
-| `metrics-path`     | `/metrics`                                            | 메트릭이 제공될 HTTP 경로 (예: `/metrics`)                       |
-| `ignore-ssl`       | `false`                                               | Monit 엔드포인트에 대해 SSL 인증서 검증을 무시할지 여부                    |
-| `monit-scrape-uri` | `http://localhost:2812/_status?format=xml&level=full` | Monit 상태를 스크랩할 XML URL                                 |
-| `monit-user`       | *(없음)*                                                | Monit에 접근하기 위한 Basic auth 사용자 이름                       |
-| `monit-password`   | *(없음)*                                                | Monit에 접근하기 위한 Basic auth 비밀번호                         |
-| `log-level`        | `info`                                                | 애플리케이션의 로그 레벨 (debug, info, warn, error, fatal, panic) |
+| 플래그                | 기본값                                                   | 설명                                                      |
+|--------------------|-------------------------------------------------------|---------------------------------------------------------|
+| `listen-address`   | `localhost:9388`                                      | 익스포터가 수신할 주소 및 포트 (예: '0.0.0.0:9388').                  |
+| `metrics-path`     | `/metrics`                                            | 메트릭을 제공할 HTTP 경로 (예: '/metrics').                       |
+| `ignore-ssl`       | `false`                                               | Monit 엔드포인트에 대해 SSL 인증서 검증을 무시할지 여부.                    |
+| `monit-scrape-uri` | `http://localhost:2812/_status?format=xml&level=full` | Monit 상태 정보를 수집할 XML URL.                               |
+| `monit-user`       | *(없음)*                                                | Monit에 접근하기 위한 Basic auth 사용자 이름.                       |
+| `monit-password`   | *(없음)*                                                | Monit에 접근하기 위한 Basic auth 비밀번호.                         |
+| `log-level`        | `info`                                                | 애플리케이션의 로그 레벨 (debug, info, warn, error, fatal, panic). |
 
-Exporter를 다음과 같이 실행할 수 있습니다:
+**익스포터를 실행하려면 다음 명령어를 사용합니다:**
 
 ```bash
 ./monit_exporter serve \
@@ -146,27 +165,42 @@ Exporter를 다음과 같이 실행할 수 있습니다:
   --log-level="info"
 ```
 
-그리고 다음처럼 메트릭 엔드포인트를 확인합니다:
+**메트릭 엔드포인트를 확인하려면 다음 명령어를 사용합니다:**
 
 ```bash
 curl http://localhost:9388/metrics
 ```
 
-### 패키지 구조
+### 테스트 실행
+
+익스포터 및 Monit 컴포넌트의 단위 테스트를 실행하려면:
+
+```bash
+go test ./internal/exporter -v
+go test ./internal/monit -v
+```
+
+모든 테스트를 통과시켜 익스포터의 무결성을 검증한 후 배포하십시오.
+
+### 프로젝트 / 패키지 구조
 
 ```
 .
 ├── cmd
-│   ├── root.go       (루트 명령 및 플래그 설정)
-│   └── serve.go      (serve 명령 구현 및 서버 실행)
+│   ├── root.go       (루트 명령어와 플래그 정의)
+│   └── serve.go      (서버 실행 명령어 구현)
 ├── internal
 │   ├── config
-│   │   └── config.go (Exporter를 위한 설정 구조체)
+│   │   └── config.go (익스포터 설정 구조체 정의)
 │   ├── exporter
-│   │   └── exporter.go (Prometheus Exporter 로직 구현)
+│   │   └── exporter.go (Prometheus 익스포터 로직 구현)
 │   └── monit
-│       └── monit.go    (Monit 상태를 가져오고 파싱)
-└── main.go             (진입점: cmd.Execute() 호출)
+│       └── monit.go    (Monit 상태 수집 및 파싱)
+├── main.go             (진입점: cmd.Execute() 호출)
+├── README.md           (이 파일)
+├── LICENSE             (MIT 라이선스)
+├── exporter_test.go    (exporter.go 단위 테스트)
+└── monit_test.go       (monit.go 단위 테스트)
 ```
 
 ### 라이선스
