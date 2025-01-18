@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"errors"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -75,7 +76,7 @@ func NewExporter(cfg *config.Config) (*Exporter, error) {
 	logrus.Debugf("NewExporter: creating exporter with ListenAddress=%s, MonitScrapeURI=%s",
 		cfg.ListenAddress, cfg.MonitScrapeURI)
 
-	labelNames := []string{"check_name", "type", "monitored"}
+	labelNames := []string{"service_name", "service_type", "service_monitor_status"}
 
 	return &Exporter{
 		cfg: cfg,
@@ -347,64 +348,69 @@ func (e *Exporter) scrape() error {
 	e.up.Set(1)
 	logrus.Debug("Exporter.scrape: set exporter_up to 1 (Monit is reachable)")
 
-	for _, svc := range parsed.Services {
-		typ, ok := serviceTypes[svc.Type]
+	for service := range slices.Values(parsed.Services) {
+		serviceType, ok := serviceTypes[service.Type]
 		if !ok {
-			typ = "unknown"
-			logrus.Warnf("Exporter.scrape: unknown service type=%d, name=%s", svc.Type, svc.Name)
+			serviceType = "unknown"
+			logrus.Warnf("Exporter.scrape: unknown service service_type=%d, serviceNameservice_name=%s", service.Type, service.Name)
 		}
-		monitored := strconv.Itoa(svc.Monitor)
+		serviceMonitorStatus := strconv.Itoa(service.Monitor)
 
 		e.status.With(prometheus.Labels{
-			"check_name": svc.Name,
-			"type":       typ,
-			"monitored":  monitored,
-		}).Set(float64(svc.Status))
+			"service_name":           service.Name,
+			"service_type":           serviceType,
+			"service_monitor_status": serviceMonitorStatus,
+		}).Set(float64(service.Status))
 
-		logrus.Debugf("Exporter.scrape: service=%s, type=%s, monitor=%d, status=%d",
-			svc.Name, typ, svc.Monitor, svc.Status)
+		logrus.Debugf(
+			"Exporter.scrape: service_name=%s, service_type=%s, service_monitor_status=%d, service_status=%d",
+			service.Name,
+			serviceType,
+			service.Monitor,
+			service.Status,
+		)
 
-		e.collectServiceMetrics(svc, typ, monitored)
+		e.collectServiceMetrics(service, serviceType, serviceMonitorStatus)
 	}
 	return nil
 }
 
 // collectServiceMetrics updates detailed metrics for a single Monit service.
-func (e *Exporter) collectServiceMetrics(svc monit.Service, typeStr, monitored string) {
+func (e *Exporter) collectServiceMetrics(service monit.Service, serviceType, serviceMonitorStatus string) {
 	labels := prometheus.Labels{
-		"check_name": svc.Name,
-		"type":       typeStr,
-		"monitored":  monitored,
+		"service_name":           service.Name,
+		"service_type":           serviceType,
+		"service_monitor_status": serviceMonitorStatus,
 	}
 
-	if svc.Block != nil {
-		e.blockUsage.With(labels).Set(svc.Block.Usage)
-		e.blockTotal.With(labels).Set(svc.Block.Total)
-		e.blockPercent.With(labels).Set(svc.Block.Percent)
+	if service.Block != nil {
+		e.blockUsage.With(labels).Set(service.Block.Usage)
+		e.blockTotal.With(labels).Set(service.Block.Total)
+		e.blockPercent.With(labels).Set(service.Block.Percent)
 	}
 
-	if svc.Inode != nil {
-		e.inodeUsage.With(labels).Set(float64(svc.Inode.Usage))
-		e.inodeTotal.With(labels).Set(float64(svc.Inode.Total))
-		e.inodePercent.With(labels).Set(svc.Inode.Percent)
+	if service.Inode != nil {
+		e.inodeUsage.With(labels).Set(float64(service.Inode.Usage))
+		e.inodeTotal.With(labels).Set(float64(service.Inode.Total))
+		e.inodePercent.With(labels).Set(service.Inode.Percent)
 	}
 
-	if svc.Port != nil {
-		e.portResponseTime.With(labels).Set(svc.Port.Responsetime)
+	if service.Port != nil {
+		e.portResponseTime.With(labels).Set(service.Port.Responsetime)
 	}
 
-	if svc.System != nil {
-		e.systemLoadAvg01.With(labels).Set(svc.System.Load.Avg01)
-		e.systemLoadAvg05.With(labels).Set(svc.System.Load.Avg05)
-		e.systemLoadAvg15.With(labels).Set(svc.System.Load.Avg15)
+	if service.System != nil {
+		e.systemLoadAvg01.With(labels).Set(service.System.Load.Avg01)
+		e.systemLoadAvg05.With(labels).Set(service.System.Load.Avg05)
+		e.systemLoadAvg15.With(labels).Set(service.System.Load.Avg15)
 
-		e.systemCPUUser.With(labels).Set(svc.System.CPU.User)
-		e.systemCPUSystem.With(labels).Set(svc.System.CPU.System)
-		e.systemCPUWait.With(labels).Set(svc.System.CPU.Wait)
+		e.systemCPUUser.With(labels).Set(service.System.CPU.User)
+		e.systemCPUSystem.With(labels).Set(service.System.CPU.System)
+		e.systemCPUWait.With(labels).Set(service.System.CPU.Wait)
 
-		e.systemMemPercent.With(labels).Set(svc.System.Memory.Percent)
-		e.systemMemKilobytes.With(labels).Set(float64(svc.System.Memory.Kilobyte))
-		e.systemSwapPercent.With(labels).Set(svc.System.Swap.Percent)
-		e.systemSwapKilobytes.With(labels).Set(float64(svc.System.Swap.Kilobyte))
+		e.systemMemPercent.With(labels).Set(service.System.Memory.Percent)
+		e.systemMemKilobytes.With(labels).Set(float64(service.System.Memory.Kilobyte))
+		e.systemSwapPercent.With(labels).Set(service.System.Swap.Percent)
+		e.systemSwapKilobytes.With(labels).Set(float64(service.System.Swap.Kilobyte))
 	}
 }

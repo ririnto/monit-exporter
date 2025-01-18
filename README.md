@@ -22,7 +22,7 @@ that scrapes Monit status in XML format and exposes the metrics via an HTTP endp
 
 ### Installation
 
-1. **Install [Go](https://golang.org/dl/) (version 1.16 or higher recommended).**
+1. **Install [Go](https://golang.org/dl/) (version 1.23 or higher recommended).**
 
 2. **Clone the repository and build:**
 
@@ -124,7 +124,7 @@ Monit Exporter는 Monit 상태 정보를 XML 형식으로 수집하고 이를 Pr
 
 ### 설치
 
-1. **[Go](https://golang.org/dl/) (버전 1.16 이상 권장)을 설치합니다.**
+1. **[Go](https://golang.org/dl/) (버전 1.23 이상 권장)을 설치합니다.**
 
 2. **레포지토리를 클론하고 빌드합니다:**
 
