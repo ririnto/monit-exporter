@@ -66,7 +66,6 @@ var serveCmd = &cobra.Command{
 				http.ServeFile(w, r, filepath.Join("static", "favicon.ico"))
 			}
 		})
-		logrus.Infof("Serving embedded favicon.ico")
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			logrus.Debugf("Root path request received from %s", r.RemoteAddr)
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
