@@ -96,9 +96,7 @@ Ensure that all tests pass to verify the integrity of the exporter before deploy
 │       └── monit.go    (Fetches and parses Monit status data)
 ├── main.go             (Entrypoint: calls cmd.Execute())
 ├── README.md           (This file)
-├── LICENSE             (MIT License)
-├── exporter_test.go    (Unit tests for exporter.go)
-└── monit_test.go       (Unit tests for monit.go)
+└── LICENSE             (MIT License)
 ```
 
 ### License
@@ -198,9 +196,7 @@ go test ./internal/monit -v
 │       └── monit.go    (Monit 상태 수집 및 파싱)
 ├── main.go             (진입점: cmd.Execute() 호출)
 ├── README.md           (이 파일)
-├── LICENSE             (MIT 라이선스)
-├── exporter_test.go    (exporter.go 단위 테스트)
-└── monit_test.go       (monit.go 단위 테스트)
+└── LICENSE             (MIT 라이선스)
 ```
 
 ### 라이선스
