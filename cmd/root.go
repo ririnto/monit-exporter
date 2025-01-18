@@ -20,7 +20,7 @@ var (
 
 // RootCmd is the base command for this application.
 var RootCmd = &cobra.Command{
-	Use:   "monit_exporter",
+	Use:   "monit-exporter",
 	Short: "Monit Exporter for Prometheus",
 	Long:  "Prometheus Exporter that collects Monit status information and exposes metrics.",
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -27,9 +27,9 @@ that scrapes Monit status in XML format and exposes the metrics via an HTTP endp
 2. **Clone the repository and build:**
 
     ```bash
-    git clone https://github.com/yourusername/monit_exporter.git
-    cd monit_exporter
-    go build -o monit_exporter
+    git clone https://github.com/ririnto/monit-exporter.git
+    cd monit-exporter
+    go build -o monit-exporter
     ```
 
 ### Usage
@@ -55,7 +55,7 @@ Below is an overview of the flags defined in `cmd/root.go`:
 **Launch the exporter with desired flags:**
 
 ```bash
-./monit_exporter serve \
+./monit-exporter serve \
   --listen-address="0.0.0.0:9388" \
   --monit-scrape-uri="http://localhost:2812/_status?format=xml&level=full" \
   --monit-user="admin" \
@@ -129,9 +129,9 @@ Monit Exporter는 Monit 상태 정보를 XML 형식으로 수집하고 이를 Pr
 2. **레포지토리를 클론하고 빌드합니다:**
 
     ```bash
-    git clone https://github.com/yourusername/monit_exporter.git
-    cd monit_exporter
-    go build -o monit_exporter
+    git clone https://github.com/ririnto/monit-exporter.git
+    cd monit-exporter
+    go build -o monit-exporter
     ```
 
 ### 사용법
@@ -157,7 +157,7 @@ Monit Exporter는 Monit 상태 정보를 XML 형식으로 수집하고 이를 Pr
 **익스포터를 실행하려면 다음 명령어를 사용합니다:**
 
 ```bash
-./monit_exporter serve \
+./monit-exporter serve \
   --listen-address="0.0.0.0:9388" \
   --monit-scrape-uri="http://localhost:2812/_status?format=xml&level=full" \
   --monit-user="admin" \

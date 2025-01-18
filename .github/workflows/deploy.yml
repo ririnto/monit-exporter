@@ -31,15 +31,15 @@ jobs:
         run: |
           mkdir -p build
           if [ "${GOOS}" = "windows" ]; then
-            BINARY_NAME=monit_exporter-${GOOS}-${GOARCH}.exe
+            BINARY_NAME=monit-exporter-${GOOS}-${GOARCH}.exe
           else
-            BINARY_NAME=monit_exporter-${GOOS}-${GOARCH}
+            BINARY_NAME=monit-exporter-${GOOS}-${GOARCH}
           fi
           CGO_ENABLED=0 go build -ldflags="-s -w" -o build/${BINARY_NAME}
 
       - name: Upload binaries to GitHub Releases
         uses: softprops/action-gh-release@v1
         with:
-          files: build/monit_exporter-*
+          files: build/monit-exporter-*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
