@@ -7,8 +7,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
+
+	_ "embed"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -18,7 +21,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// serveCmd starts the Monit Exporter server.
+//go:embed static/favicon.ico
+var embeddedFavicon []byte
+
 var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Run the Monit Exporter server",
@@ -52,28 +57,27 @@ var serveCmd = &cobra.Command{
 		prometheus.MustRegister(exp)
 
 		mux := http.NewServeMux()
-		mux.Handle(cfg.MetricsPath, commonLogHandler(promhttp.Handler()))
+		mux.Handle(cfg.MetricsPath, promhttp.Handler())
+		mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+			if 0 < len(embeddedFavicon) {
+				w.Header().Set("Content-Type", "image/x-icon")
+				_, _ = w.Write(embeddedFavicon)
+			} else {
+				http.ServeFile(w, r, filepath.Join("static", "favicon.ico"))
+			}
+		})
+		logrus.Infof("Serving embedded favicon.ico")
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			logrus.Debugf("Root path request received from %s", r.RemoteAddr)
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			_, _ = fmt.Fprintf(
 				w,
-				`<html>
-                <head><title>Monit Exporter</title></head>
-                <body>
-                <h1>Monit Exporter</h1>
-                <p><a href="%s">Metrics</a></p>
-                </body>
-                </html>`,
+				`<html><head><title>Monit Exporter</title></head><body><h1>Monit Exporter</h1><p><a href="%s">Metrics</a></p></body></html>`,
 				cfg.MetricsPath,
 			)
 		})
 
-		server := &http.Server{
-			Addr:    cfg.ListenAddress,
-			Handler: mux,
-		}
-
+		server := &http.Server{Addr: cfg.ListenAddress, Handler: commonLogHandler(mux)}
 		shutdownCh := make(chan os.Signal, 1)
 		signal.Notify(shutdownCh, os.Interrupt, syscall.SIGTERM)
 		go func() {
