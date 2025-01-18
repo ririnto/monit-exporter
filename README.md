@@ -1,12 +1,10 @@
 # Monit Exporter for Prometheus
 
-> **Forked from** [commercetools/monit_exporter](https://github.com/commercetools/monit_exporter)
-
 ## English
 
 ### Introduction
 
-Monit Exporter is a Prometheus Exporter 
+Monit Exporter is a Prometheus Exporter
 that scrapes Monit status in XML format and exposes the metrics via an HTTP endpoint.
 
 ### Features
@@ -27,8 +25,8 @@ that scrapes Monit status in XML format and exposes the metrics via an HTTP endp
 2. **Clone the repository and build:**
 
     ```bash
-    git clone https://github.com/ririnto/monit-exporter.git
-    cd monit-exporter
+    git clone https://github.com/commercetools/monit_exporter.git
+    cd monit_exporter
     go build -o monit-exporter
     ```
 
@@ -127,8 +125,8 @@ Monit Exporter는 Monit 상태 정보를 XML 형식으로 수집하고 이를 Pr
 2. **레포지토리를 클론하고 빌드합니다:**
 
     ```bash
-    git clone https://github.com/ririnto/monit-exporter.git
-    cd monit-exporter
+    git clone https://github.com/commercetools/monit_exporter.git
+    cd monit_exporter
     go build -o monit-exporter
     ```
 

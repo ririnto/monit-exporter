@@ -1,4 +1,4 @@
-module github.com/ririnto/monit-exporter
+module github.com/commercetools/monit-exporter
 
 go 1.23.5
 

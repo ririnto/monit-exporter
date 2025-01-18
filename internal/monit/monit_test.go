@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/ririnto/monit-exporter/internal/config"
+	"github.com/commercetools/monit-exporter/internal/config"
 )
 
 // TestFetchMonitStatus_Success checks if FetchMonitStatus can retrieve mock XML successfully.

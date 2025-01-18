@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/commercetools/monit-exporter/internal/config"
+	"github.com/commercetools/monit-exporter/internal/monit"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/ririnto/monit-exporter/internal/config"
-	"github.com/ririnto/monit-exporter/internal/monit"
 	"github.com/sirupsen/logrus"
 )
 

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/ririnto/monit-exporter/cmd"
+	"github.com/commercetools/monit-exporter/cmd"
 	"github.com/sirupsen/logrus"
 )
 
