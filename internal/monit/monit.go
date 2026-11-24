@@ -6,11 +6,13 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"golang.org/x/net/html/charset"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/ririnto/monit-exporter/internal/config"
@@ -238,6 +240,10 @@ func redactRequestURL(err error) error {
 	if urlErr, ok := err.(*url.Error); ok {
 		redacted := *urlErr
 		redacted.URL = "[redacted]"
+		const locationParseErrorPrefix = "failed to parse Location header "
+		if strings.HasPrefix(redacted.Err.Error(), locationParseErrorPrefix) {
+			redacted.Err = errors.New(locationParseErrorPrefix + "[redacted]")
+		}
 		return &redacted
 	}
 	return err

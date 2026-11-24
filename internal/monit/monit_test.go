@@ -1,13 +1,52 @@
 package monit
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/ririnto/monit-exporter/internal/config"
 )
+
+func TestRedactRequestURL_MalformedRedirect(t *testing.T) {
+	const location = "https://redirect.example.invalid:location-marker"
+	requestURL := url.URL{Scheme: "https", Host: "monit.example.invalid", Path: "/request-marker"}
+	_, parseErr := requestURL.Parse(location)
+	if parseErr == nil {
+		t.Fatal("Expected the synthetic Location to be malformed")
+	}
+	err := redactRequestURL(&url.Error{
+		Op:  "Get",
+		URL: requestURL.String(),
+		Err: fmt.Errorf("failed to parse Location header %q: %v", location, parseErr),
+	})
+	message := err.Error()
+	if strings.Contains(message, "request-marker") {
+		t.Error("The request URL still appears in the error")
+	}
+	if strings.Contains(message, "location-marker") {
+		t.Error("The malformed Location still appears in the error")
+	}
+	if !strings.Contains(message, "Get") || !strings.Contains(message, "failed to parse Location header") {
+		t.Errorf("Expected the HTTP operation and redirect parse diagnosis, got %q", message)
+	}
+}
+
+func TestRedactRequestURL_PreservesOtherCause(t *testing.T) {
+	err := redactRequestURL(&url.Error{
+		Op:  "Get",
+		URL: "https://monit.example.invalid/request-marker",
+		Err: context.DeadlineExceeded,
+	})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("Expected the timeout cause to remain available, got %v", err)
+	}
+}
 
 // TestFetchMonitStatus_Success checks if FetchMonitStatus can retrieve mock XML successfully.
 func TestFetchMonitStatus_Success(t *testing.T) {
