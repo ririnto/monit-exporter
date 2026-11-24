@@ -12,7 +12,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/ririnto/monit-exporter/internal/config"
-	"github.com/sirupsen/logrus"
 )
 
 // TestNewExporter_NilConfig verifies that providing a nil config returns an error.
@@ -295,10 +294,4 @@ monit_exporter_up 0
 `)); err != nil {
 		t.Fatal(err)
 	}
-}
-
-// Example optional test: verifying logs (only if needed).
-func TestExporter_Logs(t *testing.T) {
-	logrus.SetLevel(logrus.DebugLevel)
-	t.Log("Testing Exporter logs at DebugLevel (mock scenario)")
 }
