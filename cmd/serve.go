@@ -46,7 +46,15 @@ var serveCmd = &cobra.Command{
 			MonitPassword:  monitPassword,
 			LogLevel:       logLevel,
 		}
-		logrus.Debugf("Server configuration loaded: %+v", cfg)
+		logrus.Debugf(
+			"Server configuration loaded: ListenAddress=%s, MetricsPath=%s, IgnoreSSL=%t, MonitScrapeURI=%s, MonitUser=%s, LogLevel=%s",
+			cfg.ListenAddress,
+			cfg.MetricsPath,
+			cfg.IgnoreSSL,
+			cfg.MonitScrapeURI,
+			cfg.MonitUser,
+			cfg.LogLevel,
+		)
 
 		exp, err := exporter.NewExporter(cfg)
 		if err != nil {

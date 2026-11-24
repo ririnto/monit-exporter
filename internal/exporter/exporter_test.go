@@ -2,9 +2,9 @@ package exporter
 
 import (
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
@@ -39,8 +39,6 @@ func TestNewExporter_ValidConfig(t *testing.T) {
 
 // TestExporter_Collect_Success uses a mock server returning a valid Monit XML response.
 func TestExporter_Collect_Success(t *testing.T) {
-	t.Log("Testing Exporter.Collect with a successful Monit response")
-
 	mockXML := `<?xml version="1.0"?>
     <monit>
       <server><version>5.26.0</version></server>
@@ -52,40 +50,40 @@ func TestExporter_Collect_Success(t *testing.T) {
       </service>
     </monit>`
 
+	const user, password = "monit-test-user", "monit-metrics-test-password"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Logf("Mock server received request: %s %s", r.Method, r.URL.Path)
-		w.WriteHeader(http.StatusOK)
+		if gotUser, gotPassword, ok := r.BasicAuth(); !ok || gotUser != user || gotPassword != password {
+			http.Error(w, "invalid credentials", http.StatusUnauthorized)
+			return
+		}
 		_, _ = fmt.Fprintln(w, mockXML)
 	}))
 	defer server.Close()
 
 	cfg := &config.Config{
 		MonitScrapeURI: server.URL,
+		MonitUser:      user,
+		MonitPassword:  password,
 	}
 	exp, err := NewExporter(cfg)
 	if err != nil {
 		t.Fatalf("Failed to create Exporter: %v", err)
 	}
 
-	ch := make(chan prometheus.Metric)
-	go func() {
-		exp.Collect(ch)
-		close(ch)
-	}()
-
-	for range ch {
-	}
-
-	upValue := testutil.ToFloat64(exp.up)
-	if upValue != 1 {
-		t.Errorf("Expected exporter_up=1, got %f", upValue)
+	if err := testutil.CollectAndCompare(exp, strings.NewReader(`
+# HELP monit_exporter_service_check Indicates the status field from Monit.
+# TYPE monit_exporter_service_check gauge
+monit_exporter_service_check{service_monitor_status="1",service_name="rootfs",service_type="Filesystem"} 0
+# HELP monit_exporter_up Indicates whether the Monit endpoint is reachable (1) or not (0).
+# TYPE monit_exporter_up gauge
+monit_exporter_up 1
+`)); err != nil {
+		t.Fatal(err)
 	}
 }
 
 // TestExporter_Collect_MonitError uses a mock server that returns an HTTP error.
 func TestExporter_Collect_MonitError(t *testing.T) {
-	t.Log("Testing Exporter.Collect when Monit returns an error status code")
-
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "some error", http.StatusBadRequest)
 	}))
@@ -97,15 +95,12 @@ func TestExporter_Collect_MonitError(t *testing.T) {
 		t.Fatalf("Failed to create Exporter: %v", err)
 	}
 
-	ch := make(chan prometheus.Metric)
-	go func() {
-		exp.Collect(ch)
-		close(ch)
-	}()
-
-	upValue := testutil.ToFloat64(exp.up)
-	if upValue != 0 {
-		t.Errorf("Expected exporter_up=0 on error, got %f", upValue)
+	if err := testutil.CollectAndCompare(exp, strings.NewReader(`
+# HELP monit_exporter_up Indicates whether the Monit endpoint is reachable (1) or not (0).
+# TYPE monit_exporter_up gauge
+monit_exporter_up 0
+`)); err != nil {
+		t.Fatal(err)
 	}
 }
 
