@@ -10,6 +10,7 @@ import (
 	"golang.org/x/net/html/charset"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/ririnto/monit-exporter/internal/config"
@@ -195,6 +196,7 @@ func FetchMonitStatus(cfg *config.Config) ([]byte, error) {
 
 	req, err := http.NewRequestWithContext(ctx, "GET", cfg.MonitScrapeURI, nil)
 	if err != nil {
+		err = redactRequestURL(err)
 		logrus.Errorf("FetchMonitStatus: failed to create HTTP request: %v", err)
 		return nil, fmt.Errorf("unable to create request: %w", err)
 	}
@@ -208,6 +210,7 @@ func FetchMonitStatus(cfg *config.Config) ([]byte, error) {
 	logrus.Debug("FetchMonitStatus: sending request to Monit")
 	resp, err := client.Do(req)
 	if err != nil {
+		err = redactRequestURL(err)
 		logrus.Errorf("FetchMonitStatus: HTTP request failed: %v", err)
 		return nil, fmt.Errorf("unable to fetch Monit status: %w", err)
 	}
@@ -229,6 +232,15 @@ func FetchMonitStatus(cfg *config.Config) ([]byte, error) {
 	}
 	logrus.Debugf("FetchMonitStatus: successfully received response (%d bytes)", len(data))
 	return data, nil
+}
+
+func redactRequestURL(err error) error {
+	if urlErr, ok := err.(*url.Error); ok {
+		redacted := *urlErr
+		redacted.URL = "[redacted]"
+		return &redacted
+	}
+	return err
 }
 
 // ParseMonitStatus parses the XML data and returns a Monit struct.
