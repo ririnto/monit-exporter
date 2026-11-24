@@ -277,9 +277,9 @@ goreleaser check
 goreleaser release --snapshot --clean
 ```
 
-The snapshot writes raw binaries under `dist/`.
+The snapshot writes raw binaries and one `.sha256` checksum file per binary under `dist/`.
 In `dist/artifacts.json`, a release asset's `name` is the download filename, such as `monit-exporter-linux-amd64` or `monit-exporter-windows-arm64.exe`.
-Use its `path` to find the local executable.
+Use its `path` to find the local file.
 Snapshot mode skips publication and needs no new tag or GitHub token.
 To publish, the release workflow runs on a pushed semantic-version tag such as `v1.2.3`.
 
@@ -443,9 +443,9 @@ goreleaser check
 goreleaser release --snapshot --clean
 ```
 
-스냅샷은 `dist/` 아래에 실행 파일을 생성합니다.
+스냅샷은 `dist/` 아래에 실행 파일과 실행 파일별 `.sha256` 체크섬 파일을 생성합니다.
 `dist/artifacts.json`에서 각 릴리스 에셋의 `name`은 `monit-exporter-linux-amd64` 또는 `monit-exporter-windows-arm64.exe`와 같은 다운로드 파일 이름입니다.
-로컬 실행 파일의 위치는 `path`에서 확인할 수 있습니다.
+로컬 파일의 위치는 `path`에서 확인할 수 있습니다.
 스냅샷은 게시하지 않으며 새 태그나 GitHub 토큰이 필요하지 않습니다.
 릴리스 워크플로는 `v1.2.3`과 같은 시맨틱 버전 태그를 푸시할 때 실행됩니다.
 

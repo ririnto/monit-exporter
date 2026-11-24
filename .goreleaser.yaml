@@ -17,7 +17,7 @@ archives:
     name_template: 'monit-exporter-{{ .Os }}-{{ .Arch }}'
 
 checksum:
-  disable: true
+  split: true
 
 changelog:
   disable: true
