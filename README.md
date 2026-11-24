@@ -69,6 +69,13 @@ Below is an overview of the flags defined in `cmd/root.go`:
 curl http://localhost:9388/metrics
 ```
 
+#### Process restarts
+
+`monit_service_process_pid` is a gauge labeled by `service_name`.
+The exporter emits it only when Monit reports a valid PID for a process service.
+Use `changes(monit_service_process_pid[1h])` to count observed PID changes per series over the past hour as an estimate of restarts.
+Gaps between Monit polls or Prometheus scrapes can hide restarts, and the operating system can reuse a PID.
+
 #### Troubleshooting Monit scrapes
 
 If Monit returns HTTP 401, check that `--monit-user` and `--monit-password` match the credentials configured for Monit's HTTP server.
@@ -174,6 +181,13 @@ Monit Exporter는 Monit 상태 정보를 XML 형식으로 수집하고 이를 Pr
 ```bash
 curl http://localhost:9388/metrics
 ```
+
+#### 프로세스 재시작
+
+`monit_service_process_pid`는 `service_name` 라벨이 있는 게이지입니다.
+Monit이 프로세스 서비스의 유효한 PID를 보고할 때만 이 메트릭을 노출합니다.
+`changes(monit_service_process_pid[1h])`로 지난 한 시간 동안 시계열별로 관측된 PID 변경 횟수를 세어 재시작 횟수를 추정할 수 있습니다.
+Monit 폴링이나 Prometheus 스크레이프 사이에 발생한 재시작을 놓칠 수 있으며, 운영체제가 같은 PID를 재사용할 수도 있습니다.
 
 #### Monit 수집 오류 해결
 

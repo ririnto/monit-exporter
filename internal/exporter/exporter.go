@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -14,7 +15,8 @@ import (
 )
 
 const (
-	namespace = "monit"
+	namespace           = "monit"
+	processServiceLabel = "Process"
 )
 
 var (
@@ -27,7 +29,7 @@ var serviceTypes = map[int]string{
 	0: "Filesystem",
 	1: "Directory",
 	2: "File",
-	3: "Process",
+	3: processServiceLabel,
 	4: "Remote host",
 	5: "System",
 	6: "Fifo",
@@ -40,8 +42,9 @@ type Exporter struct {
 	cfg   *config.Config
 	mutex sync.Mutex
 
-	up     prometheus.Gauge
-	status *prometheus.GaugeVec
+	up         prometheus.Gauge
+	status     *prometheus.GaugeVec
+	processPID *prometheus.GaugeVec
 
 	blockUsage   *prometheus.GaugeVec
 	blockTotal   *prometheus.GaugeVec
@@ -93,6 +96,14 @@ func NewExporter(cfg *config.Config) (*Exporter, error) {
 				Help:      "Indicates the status field from Monit.",
 			},
 			labelNames,
+		),
+		processPID: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "service_process_pid",
+				Help:      "Process ID reported by Monit.",
+			},
+			[]string{"service_name"},
 		),
 
 		blockUsage: prometheus.NewGaugeVec(
@@ -243,6 +254,7 @@ func NewExporter(cfg *config.Config) (*Exporter, error) {
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.up.Describe(ch)
 	e.status.Describe(ch)
+	e.processPID.Describe(ch)
 
 	e.blockUsage.Describe(ch)
 	e.blockTotal.Describe(ch)
@@ -278,6 +290,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	logrus.Debug("Exporter.Collect: resetting metrics before scrape")
 
 	e.status.Reset()
+	e.processPID.Reset()
 	e.blockUsage.Reset()
 	e.blockTotal.Reset()
 	e.blockPercent.Reset()
@@ -303,6 +316,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	e.up.Collect(ch)
 	e.status.Collect(ch)
+	e.processPID.Collect(ch)
 	e.blockUsage.Collect(ch)
 	e.blockTotal.Collect(ch)
 	e.blockPercent.Collect(ch)
@@ -377,6 +391,13 @@ func (e *Exporter) scrape() error {
 
 // collectServiceMetrics updates detailed metrics for a single Monit service.
 func (e *Exporter) collectServiceMetrics(service monit.Service, serviceType, serviceMonitorStatus string) {
+	if serviceType == processServiceLabel {
+		pid, err := strconv.ParseInt(strings.TrimSpace(service.PID), 10, 32)
+		if err == nil && pid > 0 {
+			e.processPID.WithLabelValues(service.Name).Set(float64(pid))
+		}
+	}
+
 	labels := prometheus.Labels{
 		"service_name":           service.Name,
 		"service_type":           serviceType,

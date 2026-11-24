@@ -75,6 +75,7 @@ type Service struct {
 	Mode          string  `xml:"mode,omitempty"`
 	UID           int     `xml:"uid,omitempty"`
 	GID           int     `xml:"gid,omitempty"`
+	PID           string  `xml:"pid,omitempty"`
 	Block         *Block  `xml:"block,omitempty"`
 	Inode         *Inode  `xml:"inode,omitempty"`
 	Read          string  `xml:"read,omitempty"`
