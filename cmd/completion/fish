@@ -1,4 +1,4 @@
-function __monit_exporter_completion
+function __monit-exporter_completion
     set -l words (commandline -opc)
     set -l current (commandline -ct | string collect --allow-empty)
     set -l entries (command $words[1] __COMPLETE_COMMAND__ $words[2..-1] "$current")
@@ -11,4 +11,4 @@ function __monit_exporter_completion
         printf '%s\n' $entries[1..-2]
     end
 end
-complete -c monit-exporter -f -a '(__monit_exporter_completion)'
+complete -c monit-exporter -f -a '(__monit-exporter_completion)'
