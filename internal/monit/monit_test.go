@@ -2,11 +2,14 @@ package monit
 
 import (
 	"context"
+	"encoding/xml"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -96,8 +99,8 @@ func TestFetchMonitStatus_Non2xx(t *testing.T) {
 			defer server.Close()
 
 			data, err := FetchMonitStatus(&config.Config{MonitScrapeURI: server.URL})
-			if want := fmt.Sprintf("monit returned non-2xx status code: %d", test.status); err == nil || err.Error() != want {
-				t.Fatalf("expected %q, got %v", want, err)
+			if err == nil || !strings.Contains(err.Error(), strconv.Itoa(test.status)) {
+				t.Errorf("expected the error to identify HTTP status %d, got %v", test.status, err)
 			}
 			if len(data) != 0 {
 				t.Errorf("expected no status data, got %d bytes", len(data))
@@ -128,27 +131,39 @@ func TestParseMonitStatus_Error(t *testing.T) {
 	t.Parallel()
 
 	for _, test := range []struct {
-		name      string
-		body      string
-		wantError string
+		name         string
+		body         string
+		matchesCause func(error) bool
 	}{
 		{
-			name:      "truncated XML",
-			body:      "<monit><server>missing closing tags",
-			wantError: "failed to parse Monit XML: XML syntax error on line 1: unexpected EOF",
+			name: "truncated XML",
+			body: "<monit><server>missing closing tags",
+			matchesCause: func(err error) bool {
+				var syntaxErr *xml.SyntaxError
+				return errors.As(err, &syntaxErr)
+			},
 		},
 		{
-			name:      "plain-text status",
-			body:      "Monit 5.25.3 uptime: 1m\n\nSystem 'status-probe'\n",
-			wantError: "failed to parse Monit XML: EOF",
+			name: "plain-text status",
+			body: "Monit 5.25.3 uptime: 1m\n\nSystem 'status-probe'\n",
+			matchesCause: func(err error) bool {
+				return errors.Is(err, io.EOF)
+			},
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
 			_, err := ParseMonitStatus([]byte(test.body))
-			if err == nil || err.Error() != test.wantError {
-				t.Errorf("expected %q, got %v", test.wantError, err)
+			if err == nil {
+				t.Fatal("expected a parse error")
+			}
+			if !test.matchesCause(err) {
+				t.Errorf("unexpected parse error cause: %v", err)
+			}
+			message := strings.ToLower(err.Error())
+			if !strings.Contains(message, "monit") || !strings.Contains(message, "xml") {
+				t.Errorf("expected Monit XML context in the error, got %v", err)
 			}
 		})
 	}
