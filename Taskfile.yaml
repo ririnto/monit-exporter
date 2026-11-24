@@ -1,0 +1,15 @@
+version: "3"
+
+tasks:
+  build:
+    desc: Build the monit-exporter binary
+    cmds:
+      - go build -o monit-exporter
+  test:
+    desc: Run the Go tests
+    cmds:
+      - go test ./...
+  lint:
+    desc: Check Go formatting and lint
+    cmds:
+      - go tool -modfile=lint.mod golangci-lint run --config .golangci.yaml ./...
