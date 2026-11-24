@@ -69,6 +69,14 @@ Below is an overview of the flags defined in `cmd/root.go`:
 curl http://localhost:9388/metrics
 ```
 
+#### Troubleshooting Monit scrapes
+
+If Monit returns HTTP 401, check that `--monit-user` and `--monit-password` match the credentials configured for Monit's HTTP server.
+Older exporter releases could report Monit's HTML error page as an XML syntax error.
+
+Use `/_status?format=xml&level=full` in `--monit-scrape-uri`.
+Without `format=xml`, Monit serves the status as plain text.
+
 ### Running tests and lint
 
 Run the pull-request checks locally.
@@ -166,6 +174,14 @@ Monit Exporter는 Monit 상태 정보를 XML 형식으로 수집하고 이를 Pr
 ```bash
 curl http://localhost:9388/metrics
 ```
+
+#### Monit 수집 오류 해결
+
+Monit이 HTTP 401을 반환하면 `--monit-user`와 `--monit-password`가 Monit HTTP 서버에 설정된 인증 정보와 일치하는지 확인하세요.
+이전 버전의 익스포터는 Monit의 HTML 오류 페이지를 XML 구문 오류로 보고할 수 있습니다.
+
+`--monit-scrape-uri`에는 `/_status?format=xml&level=full`을 사용하세요.
+`format=xml`을 생략하면 Monit은 상태를 일반 텍스트로 반환합니다.
 
 ### 테스트 및 린트 실행
 
