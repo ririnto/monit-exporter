@@ -99,6 +99,145 @@ Older exporter releases could report Monit's HTML error page as an XML syntax er
 Use `/_status?format=xml&level=full` in `--monit-scrape-uri`.
 Without `format=xml`, Monit serves the status as plain text.
 
+### Metrics inventory
+
+The exporter reads Monit's `/_status?format=xml&level=full` response.
+The wire reference is Monit's release source, `src/http/xml.c` (`document_head`, `status_service`, and `status_xml`) and `src/http/cervlet.c` (`print_status`).
+The five source archives in the fixture matrix had no standalone XML schema. Their serializers define the element names, nesting, and optional fields.
+The [Monit 6.1.0 manual][inventory-monit-manual] documents what you can configure. The [source archives][inventory-monit-dist] and [release notes][inventory-monit-changes] establish what applies to each version, as checked on 2026-11-24.
+
+`/_status` uses Monit's status format 1, with `monit/server/version` and `monit/service[@type]/name`.
+`/_status2` uses format 2, with the Monit version on the root and services under `monit/services/service`, with `@name` and a `type` child.
+The [parser](internal/monit/monit.go) reads the format 1 layout. A valid format 2 document can produce `monit_exporter_up 1` with no service series.
+Both formats use XML declaration version `1.0`, which is independent of the Monit release and status format numbers.
+
+#### Exported metrics
+
+All `monit_*` families below are gauges. In the table, **service labels** means `service_name`, `service_type`, and `service_monitor_status`.
+Both `service_name` and `check_name` carry the XML service name. `service_type` uses the names in the coverage table or `unknown` for an unrecognized type code.
+`service_monitor_status` is the decimal string from `<monitor>`. Monit defines `0` as unmonitored, `1` as monitored, `2` as initializing, and `4` as the waiting flag in `src/monit.h`.
+The collector clears service series before each scrape. A failed fetch or parse leaves only `monit_exporter_up` among the Monit families. [Metric definitions and collection](internal/exporter/exporter.go)
+
+| Metric | Labels | Value |
+| --- | --- | --- |
+| `monit_exporter_up` | None | `1` after a successful fetch and XML decode, `0` on fetch or decode failure. |
+| `monit_exporter_service_check` | Service labels | Raw `<status>` event-class bitmap. `0` means no bits are set. A missing element decodes as `0`. |
+| `monit_service_process_pid` | `service_name` | Positive signed 32-bit decimal `<pid>` for `Process`. Missing and invalid PIDs are omitted. |
+| `monit_service_cpu_perc` | `check_name`, `type` | `cpu/percent` for `percentage`, `cpu/percenttotal` for `percentage_total`. Both use Monit's percentage scale. |
+| `monit_service_mem_bytes` | `check_name`, `type` | `memory/kilobyte` for `process`, `memory/kilobytetotal` for `process_and_children`. Both are multiplied by 1024. |
+| `monit_service_write_bytes_per_second` | `check_name` | `write/bytes/count`, in bytes per second. |
+| `monit_service_write_cumulative_bytes` | `check_name` | `write/bytes/total`, in bytes, exposed as a gauge. |
+| `monit_service_block_usage_bytes` | Service labels | Raw `block/usage`. Monit emits MiB, and the exporter forwards the number unchanged. |
+| `monit_service_block_total_bytes` | Service labels | Raw `block/total`, also in MiB. |
+| `monit_service_block_usage_percent` | Service labels | `block/percent`, on Monit's percentage scale. |
+| `monit_service_inode_usage` | Service labels | `inode/usage`, the used inode count. |
+| `monit_service_inode_total` | Service labels | `inode/total`, the total inode count. |
+| `monit_service_inode_usage_percent` | Service labels | `inode/percent`, on Monit's percentage scale. |
+| `monit_service_port_response_seconds` | Service labels | `port/responsetime` in seconds, including Monit's `-1` if a check is unavailable. The last `<port>` supplies the response time when several are present. |
+| `monit_service_system_loadavg_01` | Service labels | `system/load/avg01`, the one-minute load average. |
+| `monit_service_system_loadavg_05` | Service labels | `system/load/avg05`, the five-minute load average. |
+| `monit_service_system_loadavg_15` | Service labels | `system/load/avg15`, the fifteen-minute load average. |
+| `monit_service_system_cpu_user_percent` | Service labels | `system/cpu/user` percentage. |
+| `monit_service_system_cpu_system_percent` | Service labels | `system/cpu/system` percentage. |
+| `monit_service_system_cpu_wait_percent` | Service labels | `system/cpu/wait` percentage. |
+| `monit_service_system_memory_usage_percent` | Service labels | `system/memory/percent`. |
+| `monit_service_system_memory_usage_kilobytes` | Service labels | `system/memory/kilobyte`, in 1024-byte units. |
+| `monit_service_system_swap_usage_percent` | Service labels | `system/swap/percent`. |
+| `monit_service_system_swap_usage_kilobytes` | Service labels | `system/swap/kilobyte`, in 1024-byte units. |
+
+The four process resource families require `Process` and emit only finite, nonnegative values, including zero. The total CPU and memory series include descendants.
+For Linux and macOS, the reviewed 5.26.0 sources use physical I/O for process `write/bytes`. The later serializers put physical I/O in `write/bytes` and generic I/O in `write/bytesgeneric`.
+Block, inode, port, and system gauges depend on their enclosing XML element. With an enclosing element present, missing numeric children emit zero.
+Monit 6.1.0 computes the legacy `<status>` and `<status_hint>` bitmaps from detailed events. See `src/event.h` and `src/event.c` in the [6.1.0 source][inventory-monit-610] for the bit and event definitions.
+
+#### Service coverage
+
+Every decoded service has the common status gauge. Monit's `Service_Type` enum in `src/monit.h` ends at `Service_Net` across the reviewed releases.
+The fields below describe the 6.1.0 status XML. Earlier versions and individual platforms can omit fields.
+
+| Code and `service_type` | Extra metrics today | Other status XML fields |
+| --- | --- | --- |
+| `0` `Filesystem` | Block and inode gauges | `fstype`, `fsflags`, `mode`, `uid`, `gid`, `read` and `write` bytes and operations, and `servicetime` read, write, wait, and run. |
+| `1` `Directory` | None | Mode, UID, GID, hard-link count, and access, change, and modification timestamps. |
+| `2` `File` | None | Directory-style metadata, size in bytes, configured checksum type and digest. Content-match outcomes are events. |
+| `3` `Process` | PID, CPU, memory, disk write, and TCP or UDP port response | Parent PID, UID, EUID, GID, uptime, threads, children, memory percentages, and file descriptor counts and limits. `read` and `write` can report physical bytes, generic bytes, and operation rates and totals. Unix socket results also apply. |
+| `4` `Remote host` | TCP or UDP port response | Repeated ports with endpoint, request, protocol, transport, response time, and optional certificate validity in days. Repeated ICMP and Unix socket checks report response times. |
+| `5` `System` | Load, user/system/wait CPU, memory, and swap | Uptime, boot time, file descriptors, extra CPU modes (`nice`, `hardirq`, `softirq`, `steal`, `guest`, `guestnice`), and swap `paging/in` and `paging/out` rates. |
+| `6` `Fifo` | None | Mode, UID, GID, hard-link count, and access, change, and modification timestamps. |
+| `7` `Program` | None | `program/started` and `program/status` hold the start timestamp and exit code once available. `program/output` is text. |
+| `8` `Network` | None | `link/state`, `link/speed`, `link/duplex`, plus upload and download packet, byte, and error rates (`now`) and totals (`total`). `src/net/Link.c` defines which fields use `-1` for unavailable values. |
+
+Custom scripts use `CHECK PROGRAM`. Configured tests such as content matching, protocol checks, and send/expect attach to an existing service type.
+Monit reports their state through the service status and any applicable program or connection fields. Program output has no structured numeric schema.
+All service types can also carry collection time (`collected_sec` and `collected_usec`), status hints, monitor mode, reboot policy, pending action, an `every` schedule when configured, and detailed `errors/event` entries in 6.1.0.
+The status document also carries daemon version, uptime, poll interval and start delay, HTTP interface settings, and platform identity, CPU count, and memory and swap capacity. Format 2 adds service groups.
+Top-level event and M/Monit host group elements belong to M/Monit reports. The HTTP status handler supplies neither.
+
+#### Fixture versions
+
+The [parser and fetch tests](internal/monit/monit_test.go), [collector tests](internal/exporter/exporter_test.go), and [CLI tests](cmd/root_test.go) use inline XML labeled 5.26.0.
+The process resource test puts the release on the root while keeping format 1 service elements. Its mixed layout is synthetic.
+The 5.25.3 case is a plain-text rejection test. The historical 5.25.3 and 5.26.0 authentication reproductions above are separate from the checked-in fixtures.
+The current direct metric assertions cover reachability, common status, PID, and process resources. Filesystem detail, port response, and system detail lack direct assertions.
+
+| Monit release | Proposed fixture role | Coverage to capture |
+| --- | --- | --- |
+| [5.25.3][inventory-monit-525] | Keep the existing negative case | Plain-text rejection. The XML serializer is identical to 5.26.0, so use 5.26.0 for the legacy positive fixture. |
+| [5.26.0][inventory-monit-526] | Legacy format 1 baseline | Capture an ISO-8859-1 response with a non-ASCII service name, legacy status bits, PID, CPU, memory, and process I/O. |
+| [5.35.2][inventory-monit-535] | Last published 5.x baseline | Capture additional system CPU modes, system and process file descriptors, hard-link counts, and the process `bytesgeneric` and physical `bytes` distinction. |
+| [6.0.0][inventory-monit-600] | 6.x transition case | Capture system paging and process memory on Linux. The release prefers proportional set size on Linux and uses physical footprint on macOS, so assert conversion of the captured input. |
+| [6.1.0][inventory-monit-610] | Current 6.x baseline | Capture UTF-8 format 1 for all nine types, detailed events beside legacy status bits, repeated probes, and absent optional fields. Capture format 2 separately for explicit compatibility coverage. |
+
+The matrix proposes regression targets. The source comparison does not establish runtime support for every release or platform.
+Use versioned, sanitized responses from a controlled Monit instance. Record the release, platform, endpoint, encoding, and check configuration so each response can be regenerated.
+Use focused synthetic cases for failure and boundary values. Exclude credentials, command output, request contents, and private host and path values from committed fixtures.
+
+#### Conventions and compatibility
+
+- `monit-exporter serve` uses CLI flags, listens on `localhost:9388` by default, and serves `/metrics` through `promhttp`.
+  It fetches one Monit target on demand with Basic Auth, a five-second timeout, and TLS verification enabled by default.
+  HTTP or XML failures set `monit_exporter_up` to `0` while the exporter can still answer the scrape. [CLI](cmd/root.go), [HTTP server](cmd/serve.go), [Monit client](internal/monit/monit.go), [Prometheus exporter guidance][inventory-prom-exporters]
+- The registry also includes the client library's Go runtime metrics and, on non-Darwin platforms, process metrics for the exporter itself.
+  `promhttp_metric_handler_requests_total` counts completed scrapes by `code` (HTTP status), and `promhttp_metric_handler_requests_in_flight` gauges current scrapes without labels. [HTTP server](cmd/serve.go), [Prometheus handler instrumentation][inventory-prom-handler]
+- Synchronous collection and the upstream reachability gauge follow Prometheus exporter guidance. The collector serializes requests around mutable gauges and resets them each time. Prometheus recommends const metrics for custom collectors to handle concurrent scrapes and disappearing series. For new families, use base units, ratios for fractions, bounded labels, and `_total` for suitable counters. Review overlaps with node exporter for system and filesystem stats. [Prometheus exporter guidance][inventory-prom-exporters], [metric and label naming][inventory-prom-naming]
+- The [Taskfile](Taskfile.yaml) provides build, test, and lint commands. [Pull request CI](.github/workflows/test.yaml) runs the Go suite and pinned `golangci-lint`. Tests use `httptest`, Prometheus exposition comparisons, and a built CLI subprocess. [Go test command][inventory-go-test], [Prometheus exposition formats][inventory-prom-formats]
+- The [release workflow](.github/workflows/deploy.yaml) runs on `v*` tag pushes. It builds with `CGO_ENABLED=0` for Linux, macOS, and Windows on `amd64` and `arm64`, then uploads `monit-exporter-<goos>-<goarch>` with `.exe` on Windows. The tag filter and OS/architecture matrix define the trigger and artifact set. [GitHub Actions workflow syntax][inventory-actions]
+
+#### Follow-up pull requests
+
+Each item is a separate proposed pull request. For every new metric, include a versioned XML fixture and an exposition test that asserts the name, type, labels, value, and applicable missing-data behavior.
+Keep established series compatible. Changes to names, labels, units, or target behavior need their own compatibility decision.
+
+1. **Establish the status-format baseline.** Add representative format 1 fixtures and assert all nine service labels, a combined status bitmap, monitoring flag changes, and removal after a failed scrape. Use `/_status2` to reproduce the empty-service success case and make support or a diagnostic an explicit decision. Evidence is `Monit.Services`, `ParseMonitStatus`, and Monit's `print_status` and `status_xml`.
+2. **Cover filesystem capacity and units.** Assert current block and inode values with `block` and optional `inode`, including absent children. Propose a correctly scaled capacity family with a migration plan for the byte-named legacy gauges. Evidence is `status_service` and `collectServiceMetrics`.
+3. **Cover repeated port checks and TLS.** Keep the legacy response gauge and add per-probe response, availability, and certificate lifetime where present. Test repeated endpoints, `-1`, missing certificates, and checks with the same endpoint and protocol. Establish a stable identity without exporting raw requests. Evidence is `Port` in the parser and the Monit port loop in `status_service`.
+4. **Add ICMP and Unix socket results.** Use the `icmp` and `unix` loops in `status_service`. Test multiple probes, no probe, and unavailable response times for host and process checks as applicable.
+5. **Add network link metrics.** Use `link` in `status_service` and `src/net/Link.c` for state, speed, duplex, and directional bytes, packets, and errors. Test down or unknown links, unavailable speed, zero traffic, and totals above 32 bits.
+6. **Complete process I/O.** Add read and operation metrics, and evaluate generic versus physical byte series using `_ioStatisticsProcess`. Test absent and zero values, reset behavior, and wide totals while retaining the existing physical write gauges.
+7. **Add process lifecycle and limits.** Use the process branch in `status_service` for uptime, parent PID, thread and child counts, memory percentages, and descriptor counts and limits. Test process-engine-disabled and unavailable fields. Evaluate identity metadata (UID, EUID, GID) separately from workload gauges within that review.
+8. **Add program results.** Use `program/started` and `program/status` to expose last-start time and exit code. Test never-run, successful, and nonzero exits. The raw output can contain arbitrary text and belongs in Monit diagnostics.
+9. **Add filesystem I/O.** Use `_ioStatisticsFilesystem` and `servicetime` for read and write rates, totals, operations, and supported timings. Test an unavailable timing and a real zero. Treat filesystem type, flags, and ownership as metadata and limit any new label values.
+10. **Add system detail.** Use the system branch and `system` block for uptime, boot time, file descriptors, extra CPU modes, and paging. Test missing platform fields and zero values across 5.x and 6.x. Preserve existing system gauges and check which new metrics add Monit-specific value.
+11. **Add file, directory, and FIFO metadata.** Use the three respective branches for mode, ownership, hard links, timestamps, and file size. Test absent fields and newer hard-link fields. Use checksum and content event state for monitoring, with raw digests kept in Monit.
+12. **Expose common service state.** Use `status_service` and `src/monit.h` for collection time, pending actions, monitor mode, reboot policy, and legacy hints. Test legacy bitmaps and changes across scrapes. Evaluate `every` as schedule metadata.
+13. **Expose detailed event state.** Use the `errors/event` loop in `status_service` and ID and state definitions in `src/event.h` and `src/event.c`. Test older releases without the element, simultaneous events, event recovery, and unknown IDs.
+14. **Evaluate daemon and platform metrics.** Use `document_head` for daemon uptime, poll interval, start delay, version, CPU count, and memory and swap capacity. Test capacity conversion and omit private metadata from labels. Service groups are configuration metadata. Event notifications, credentials, and raw program or request text are outside the scrape metric contract.
+
+[inventory-monit-manual]: https://mmonit.com/monit/documentation/monit.html
+[inventory-monit-changes]: https://mmonit.com/monit/changes/
+[inventory-monit-dist]: https://mmonit.com/monit/dist/
+[inventory-monit-525]: https://mmonit.com/monit/dist/monit-5.25.3.tar.gz
+[inventory-monit-526]: https://mmonit.com/monit/dist/monit-5.26.0.tar.gz
+[inventory-monit-535]: https://mmonit.com/monit/dist/monit-5.35.2.tar.gz
+[inventory-monit-600]: https://mmonit.com/monit/dist/monit-6.0.0.tar.gz
+[inventory-monit-610]: https://mmonit.com/monit/dist/monit-6.1.0.tar.gz
+[inventory-prom-exporters]: https://prometheus.io/docs/instrumenting/writing_exporters/
+[inventory-prom-naming]: https://prometheus.io/docs/practices/naming/
+[inventory-prom-formats]: https://prometheus.io/docs/instrumenting/exposition_formats/
+[inventory-prom-handler]: https://pkg.go.dev/github.com/prometheus/client_golang@v1.25.0/prometheus/promhttp#InstrumentMetricHandler
+[inventory-go-test]: https://pkg.go.dev/cmd/go#hdr-Test_packages
+[inventory-actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
+
 ### Upstream decisions
 
 - On Monit 5.25.3 and 5.26.0, omitting Basic Auth credentials reproduced the reported XML syntax error.
