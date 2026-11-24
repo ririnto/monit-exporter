@@ -79,10 +79,16 @@ type Service struct {
 	Block         *Block  `xml:"block,omitempty"`
 	Inode         *Inode  `xml:"inode,omitempty"`
 	Read          string  `xml:"read,omitempty"`
-	Write         string  `xml:"write,omitempty"`
 	Port          *Port   `xml:"port,omitempty"`
 	System        *System `xml:"system,omitempty"`
 	Link          *Link   `xml:"link,omitempty"`
+
+	CPUPercent           string `xml:"cpu>percent,omitempty"`
+	CPUPercentTotal      string `xml:"cpu>percenttotal,omitempty"`
+	MemoryKilobytes      string `xml:"memory>kilobyte,omitempty"`
+	MemoryKilobytesTotal string `xml:"memory>kilobytetotal,omitempty"`
+	WriteBytesPerSecond  string `xml:"write>bytes>count,omitempty"`
+	WriteBytesTotal      string `xml:"write>bytes>total,omitempty"`
 }
 
 // Block represents the <block> element under a filesystem service.

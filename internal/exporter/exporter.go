@@ -3,6 +3,7 @@ package exporter
 
 import (
 	"errors"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -46,6 +47,10 @@ type Exporter struct {
 	status     *prometheus.GaugeVec
 	processPID *prometheus.GaugeVec
 
+	processCPU    *prometheus.GaugeVec
+	processMemory *prometheus.GaugeVec
+	processWrite  *prometheus.GaugeVec
+
 	blockUsage   *prometheus.GaugeVec
 	blockTotal   *prometheus.GaugeVec
 	blockPercent *prometheus.GaugeVec
@@ -80,6 +85,7 @@ func NewExporter(cfg *config.Config) (*Exporter, error) {
 	logrus.Debugf("NewExporter: creating exporter with ListenAddress=%s", cfg.ListenAddress)
 
 	labelNames := []string{"service_name", "service_type", "service_monitor_status"}
+	processResourceLabels := []string{"check_name", "type"}
 
 	return &Exporter{
 		cfg: cfg,
@@ -104,6 +110,30 @@ func NewExporter(cfg *config.Config) (*Exporter, error) {
 				Help:      "Process ID reported by Monit.",
 			},
 			[]string{"service_name"},
+		),
+		processCPU: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "service_cpu_perc",
+				Help:      "CPU usage percentage for a Monit process check.",
+			},
+			processResourceLabels,
+		),
+		processMemory: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "service_mem_bytes",
+				Help:      "Memory usage in bytes for a Monit process check.",
+			},
+			processResourceLabels,
+		),
+		processWrite: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "service_write_bytes",
+				Help:      "Disk write rate in bytes per second or cumulative bytes for a Monit process check, by type.",
+			},
+			processResourceLabels,
 		),
 
 		blockUsage: prometheus.NewGaugeVec(
@@ -255,6 +285,9 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.up.Describe(ch)
 	e.status.Describe(ch)
 	e.processPID.Describe(ch)
+	e.processCPU.Describe(ch)
+	e.processMemory.Describe(ch)
+	e.processWrite.Describe(ch)
 
 	e.blockUsage.Describe(ch)
 	e.blockTotal.Describe(ch)
@@ -291,6 +324,9 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	e.status.Reset()
 	e.processPID.Reset()
+	e.processCPU.Reset()
+	e.processMemory.Reset()
+	e.processWrite.Reset()
 	e.blockUsage.Reset()
 	e.blockTotal.Reset()
 	e.blockPercent.Reset()
@@ -317,6 +353,9 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.up.Collect(ch)
 	e.status.Collect(ch)
 	e.processPID.Collect(ch)
+	e.processCPU.Collect(ch)
+	e.processMemory.Collect(ch)
+	e.processWrite.Collect(ch)
 	e.blockUsage.Collect(ch)
 	e.blockTotal.Collect(ch)
 	e.blockPercent.Collect(ch)
@@ -395,6 +434,26 @@ func (e *Exporter) collectServiceMetrics(service monit.Service, serviceType, ser
 		pid, err := strconv.ParseInt(strings.TrimSpace(service.PID), 10, 32)
 		if err == nil && pid > 0 {
 			e.processPID.WithLabelValues(service.Name).Set(float64(pid))
+		}
+
+		for _, sample := range [...]struct {
+			metric *prometheus.GaugeVec
+			kind   string
+			raw    string
+			scale  float64
+		}{
+			{e.processCPU, "percentage", service.CPUPercent, 1},
+			{e.processCPU, "percentage_total", service.CPUPercentTotal, 1},
+			{e.processMemory, "kilobyte", service.MemoryKilobytes, 1024},
+			{e.processMemory, "kilobyteTotal", service.MemoryKilobytesTotal, 1024},
+			{e.processWrite, "write_count", service.WriteBytesPerSecond, 1},
+			{e.processWrite, "write_count_total", service.WriteBytesTotal, 1},
+		} {
+			value, err := strconv.ParseFloat(strings.TrimSpace(sample.raw), 64)
+			value *= sample.scale
+			if err == nil && value >= 0 && !math.IsInf(value, 1) {
+				sample.metric.WithLabelValues(service.Name, sample.kind).Set(value)
+			}
 		}
 	}
 

@@ -156,6 +156,111 @@ monit_service_process_pid{service_name="worker"} %d
 	}
 }
 
+func TestExporter_ScrapeProcessResources(t *testing.T) {
+	const process = `<service type="3">
+  <name>worker</name><status>0</status><monitor>1</monitor><pid>42</pid>
+  <memory><percent>1.0</percent><percenttotal>2.0</percenttotal><kilobyte>1536</kilobyte><kilobytetotal>4096</kilobytetotal></memory>
+  <cpu><percent>2.5</percent><percenttotal>9.5</percenttotal></cpu>
+  <write><bytes><count>256</count><total>4294967296</total></bytes></write>
+</service>`
+	const filesystem = `<service type="0"><name>rootfs</name><status>0</status><monitor>1</monitor>
+  <write><bytes><count>4096</count><total>8192</total></bytes></write>
+</service>`
+	const up = `
+# HELP monit_exporter_up Indicates whether the Monit endpoint is reachable (1) or not (0).
+# TYPE monit_exporter_up gauge
+monit_exporter_up 1
+`
+	const resources = `
+# HELP monit_service_cpu_perc CPU usage percentage for a Monit process check.
+# TYPE monit_service_cpu_perc gauge
+monit_service_cpu_perc{check_name="worker",type="percentage"} 2.5
+monit_service_cpu_perc{check_name="worker",type="percentage_total"} 9.5
+# HELP monit_service_mem_bytes Memory usage in bytes for a Monit process check.
+# TYPE monit_service_mem_bytes gauge
+monit_service_mem_bytes{check_name="worker",type="kilobyte"} 1572864
+monit_service_mem_bytes{check_name="worker",type="kilobyteTotal"} 4194304
+# HELP monit_service_write_bytes Disk write rate in bytes per second or cumulative bytes for a Monit process check, by type.
+# TYPE monit_service_write_bytes gauge
+monit_service_write_bytes{check_name="worker",type="write_count"} 256
+monit_service_write_bytes{check_name="worker",type="write_count_total"} 4294967296
+`
+	var services atomic.Pointer[string]
+	monitServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if body := services.Load(); body != nil {
+			_, _ = fmt.Fprintf(w, `<monit version="5.26.0"><server/>%s</monit>`, *body)
+		} else {
+			http.Error(w, "Monit unavailable", http.StatusServiceUnavailable)
+		}
+	}))
+	defer monitServer.Close()
+
+	exp, err := NewExporter(&config.Config{MonitScrapeURI: monitServer.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry := prometheus.NewPedanticRegistry()
+	registry.MustRegister(exp)
+	metricsServer := httptest.NewServer(promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
+	defer metricsServer.Close()
+
+	for _, scrape := range []struct {
+		name     string
+		services string
+		expected string
+	}{
+		{
+			name:     "reports process resources in Monit units",
+			services: process + filesystem,
+			expected: up + resources,
+		},
+		{
+			name: "keeps zero and drops unavailable fields",
+			services: `<service type="3">
+  <name>worker</name><monitor>1</monitor><pid>42</pid>
+  <cpu><percent>0.0</percent></cpu>
+  <memory><kilobyte/></memory>
+  <write><operations><count>3</count><total>34</total></operations></write>
+</service>` + filesystem,
+			expected: up + `
+# HELP monit_service_cpu_perc CPU usage percentage for a Monit process check.
+# TYPE monit_service_cpu_perc gauge
+monit_service_cpu_perc{check_name="worker",type="percentage"} 0
+`,
+		},
+		{
+			name:     "drops resources when the process service disappears",
+			services: filesystem,
+			expected: up,
+		},
+		{
+			name:     "reports resources again when Monit supplies them",
+			services: process,
+			expected: up + resources,
+		},
+		{
+			name: "drops resources when the Monit scrape fails",
+			expected: `
+# HELP monit_exporter_up Indicates whether the Monit endpoint is reachable (1) or not (0).
+# TYPE monit_exporter_up gauge
+monit_exporter_up 0
+`,
+		},
+	} {
+		t.Run(scrape.name, func(t *testing.T) {
+			if scrape.services == "" {
+				services.Store(nil)
+			} else {
+				services.Store(&scrape.services)
+			}
+			if err := testutil.ScrapeAndCompare(metricsServer.URL+"/metrics", strings.NewReader(scrape.expected),
+				"monit_exporter_up", "monit_service_cpu_perc", "monit_service_mem_bytes", "monit_service_write_bytes"); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 // TestExporter_Collect_MonitError uses a mock server that returns an HTTP error.
 func TestExporter_Collect_MonitError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
