@@ -178,12 +178,14 @@ monit_service_cpu_perc{check_name="worker",type="percentage"} 2.5
 monit_service_cpu_perc{check_name="worker",type="percentage_total"} 9.5
 # HELP monit_service_mem_bytes Memory usage in bytes for a Monit process check.
 # TYPE monit_service_mem_bytes gauge
-monit_service_mem_bytes{check_name="worker",type="kilobyte"} 1572864
-monit_service_mem_bytes{check_name="worker",type="kilobyteTotal"} 4194304
-# HELP monit_service_write_bytes Disk write rate in bytes per second or cumulative bytes for a Monit process check, by type.
-# TYPE monit_service_write_bytes gauge
-monit_service_write_bytes{check_name="worker",type="write_count"} 256
-monit_service_write_bytes{check_name="worker",type="write_count_total"} 4294967296
+monit_service_mem_bytes{check_name="worker",type="process"} 1572864
+monit_service_mem_bytes{check_name="worker",type="process_and_children"} 4194304
+# HELP monit_service_write_bytes_per_second Disk write rate in bytes per second for a Monit process check.
+# TYPE monit_service_write_bytes_per_second gauge
+monit_service_write_bytes_per_second{check_name="worker"} 256
+# HELP monit_service_write_cumulative_bytes Cumulative disk bytes written as reported by Monit for a process check.
+# TYPE monit_service_write_cumulative_bytes gauge
+monit_service_write_cumulative_bytes{check_name="worker"} 4294967296
 `
 	var services atomic.Pointer[string]
 	monitServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -229,6 +231,17 @@ monit_service_cpu_perc{check_name="worker",type="percentage"} 0
 `,
 		},
 		{
+			name: "reports the write rate when Monit omits cumulative bytes",
+			services: `<service type="3"><name>worker</name><monitor>1</monitor>
+  <write><bytes><count>0</count></bytes></write>
+</service>`,
+			expected: up + `
+# HELP monit_service_write_bytes_per_second Disk write rate in bytes per second for a Monit process check.
+# TYPE monit_service_write_bytes_per_second gauge
+monit_service_write_bytes_per_second{check_name="worker"} 0
+`,
+		},
+		{
 			name:     "drops resources when the process service disappears",
 			services: filesystem,
 			expected: up,
@@ -254,7 +267,8 @@ monit_exporter_up 0
 				services.Store(&scrape.services)
 			}
 			if err := testutil.ScrapeAndCompare(metricsServer.URL+"/metrics", strings.NewReader(scrape.expected),
-				"monit_exporter_up", "monit_service_cpu_perc", "monit_service_mem_bytes", "monit_service_write_bytes"); err != nil {
+				"monit_exporter_up", "monit_service_cpu_perc", "monit_service_mem_bytes",
+				"monit_service_write_bytes_per_second", "monit_service_write_cumulative_bytes"); err != nil {
 				t.Fatal(err)
 			}
 		})

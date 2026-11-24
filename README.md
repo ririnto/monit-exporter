@@ -71,16 +71,16 @@ curl http://localhost:9388/metrics
 
 #### Process resource metrics
 
-These gauges use `check_name` for the Monit process service name and `type` for the value reported.
+These gauges use `check_name` for the Monit process service name. CPU and memory gauges also use `type` to identify the processes included.
 
 | Metric | `type` | Value |
 | --- | --- | --- |
 | `monit_service_cpu_perc` | `percentage` | CPU usage by the process, as a percentage |
 | `monit_service_cpu_perc` | `percentage_total` | CPU usage by the process and its children, as a percentage |
-| `monit_service_mem_bytes` | `kilobyte` | Memory used by the process, in bytes |
-| `monit_service_mem_bytes` | `kilobyteTotal` | Memory used by the process and its children, in bytes |
-| `monit_service_write_bytes` | `write_count` | Disk write rate in bytes per second |
-| `monit_service_write_bytes` | `write_count_total` | Cumulative disk bytes written as reported by Monit |
+| `monit_service_mem_bytes` | `process` | Memory used by the process, in bytes |
+| `monit_service_mem_bytes` | `process_and_children` | Memory used by the process and its children, in bytes |
+| `monit_service_write_bytes_per_second` | | Disk write rate in bytes per second |
+| `monit_service_write_cumulative_bytes` | | Cumulative disk bytes written as reported by Monit |
 
 The exporter converts Monit's memory values to bytes and emits each series only when Monit reports its value.
 
@@ -199,16 +199,16 @@ curl http://localhost:9388/metrics
 
 #### 프로세스 리소스 메트릭
 
-이 게이지는 `check_name` 라벨에 Monit 프로세스 서비스 이름을, `type` 라벨에 값의 종류를 표시합니다.
+이 게이지는 `check_name` 라벨에 Monit 프로세스 서비스 이름을 표시합니다. CPU와 메모리 게이지는 `type` 라벨로 집계에 포함된 프로세스의 범위도 표시합니다.
 
 | 메트릭 | `type` | 값 |
 | --- | --- | --- |
 | `monit_service_cpu_perc` | `percentage` | 프로세스 CPU 사용률(%) |
 | `monit_service_cpu_perc` | `percentage_total` | 프로세스와 자식 프로세스의 CPU 사용률(%) |
-| `monit_service_mem_bytes` | `kilobyte` | 프로세스 메모리 사용량(바이트) |
-| `monit_service_mem_bytes` | `kilobyteTotal` | 프로세스와 자식 프로세스의 메모리 사용량(바이트) |
-| `monit_service_write_bytes` | `write_count` | 디스크 쓰기 속도(초당 바이트) |
-| `monit_service_write_bytes` | `write_count_total` | Monit이 보고한 누적 디스크 쓰기 바이트 |
+| `monit_service_mem_bytes` | `process` | 프로세스 메모리 사용량(바이트) |
+| `monit_service_mem_bytes` | `process_and_children` | 프로세스와 자식 프로세스의 메모리 사용량(바이트) |
+| `monit_service_write_bytes_per_second` | | 디스크 쓰기 속도(초당 바이트) |
+| `monit_service_write_cumulative_bytes` | | Monit이 보고한 누적 디스크 쓰기 바이트 |
 
 익스포터는 Monit의 메모리 값을 바이트로 변환하며, Monit이 값을 보고한 시계열만 노출합니다.
 

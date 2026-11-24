@@ -47,9 +47,10 @@ type Exporter struct {
 	status     *prometheus.GaugeVec
 	processPID *prometheus.GaugeVec
 
-	processCPU    *prometheus.GaugeVec
-	processMemory *prometheus.GaugeVec
-	processWrite  *prometheus.GaugeVec
+	processCPU        *prometheus.GaugeVec
+	processMemory     *prometheus.GaugeVec
+	processWriteRate  *prometheus.GaugeVec
+	processWriteBytes *prometheus.GaugeVec
 
 	blockUsage   *prometheus.GaugeVec
 	blockTotal   *prometheus.GaugeVec
@@ -86,6 +87,7 @@ func NewExporter(cfg *config.Config) (*Exporter, error) {
 
 	labelNames := []string{"service_name", "service_type", "service_monitor_status"}
 	processResourceLabels := []string{"check_name", "type"}
+	processWriteLabels := []string{"check_name"}
 
 	return &Exporter{
 		cfg: cfg,
@@ -127,13 +129,21 @@ func NewExporter(cfg *config.Config) (*Exporter, error) {
 			},
 			processResourceLabels,
 		),
-		processWrite: prometheus.NewGaugeVec(
+		processWriteRate: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: namespace,
-				Name:      "service_write_bytes",
-				Help:      "Disk write rate in bytes per second or cumulative bytes for a Monit process check, by type.",
+				Name:      "service_write_bytes_per_second",
+				Help:      "Disk write rate in bytes per second for a Monit process check.",
 			},
-			processResourceLabels,
+			processWriteLabels,
+		),
+		processWriteBytes: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "service_write_cumulative_bytes",
+				Help:      "Cumulative disk bytes written as reported by Monit for a process check.",
+			},
+			processWriteLabels,
 		),
 
 		blockUsage: prometheus.NewGaugeVec(
@@ -287,7 +297,8 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.processPID.Describe(ch)
 	e.processCPU.Describe(ch)
 	e.processMemory.Describe(ch)
-	e.processWrite.Describe(ch)
+	e.processWriteRate.Describe(ch)
+	e.processWriteBytes.Describe(ch)
 
 	e.blockUsage.Describe(ch)
 	e.blockTotal.Describe(ch)
@@ -326,7 +337,8 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.processPID.Reset()
 	e.processCPU.Reset()
 	e.processMemory.Reset()
-	e.processWrite.Reset()
+	e.processWriteRate.Reset()
+	e.processWriteBytes.Reset()
 	e.blockUsage.Reset()
 	e.blockTotal.Reset()
 	e.blockPercent.Reset()
@@ -355,7 +367,8 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.processPID.Collect(ch)
 	e.processCPU.Collect(ch)
 	e.processMemory.Collect(ch)
-	e.processWrite.Collect(ch)
+	e.processWriteRate.Collect(ch)
+	e.processWriteBytes.Collect(ch)
 	e.blockUsage.Collect(ch)
 	e.blockTotal.Collect(ch)
 	e.blockPercent.Collect(ch)
@@ -438,21 +451,21 @@ func (e *Exporter) collectServiceMetrics(service monit.Service, serviceType, ser
 
 		for _, sample := range [...]struct {
 			metric *prometheus.GaugeVec
-			kind   string
+			labels []string
 			raw    string
 			scale  float64
 		}{
-			{e.processCPU, "percentage", service.CPUPercent, 1},
-			{e.processCPU, "percentage_total", service.CPUPercentTotal, 1},
-			{e.processMemory, "kilobyte", service.MemoryKilobytes, 1024},
-			{e.processMemory, "kilobyteTotal", service.MemoryKilobytesTotal, 1024},
-			{e.processWrite, "write_count", service.WriteBytesPerSecond, 1},
-			{e.processWrite, "write_count_total", service.WriteBytesTotal, 1},
+			{e.processCPU, []string{service.Name, "percentage"}, service.CPUPercent, 1},
+			{e.processCPU, []string{service.Name, "percentage_total"}, service.CPUPercentTotal, 1},
+			{e.processMemory, []string{service.Name, "process"}, service.MemoryKilobytes, 1024},
+			{e.processMemory, []string{service.Name, "process_and_children"}, service.MemoryKilobytesTotal, 1024},
+			{e.processWriteRate, []string{service.Name}, service.WriteBytesPerSecond, 1},
+			{e.processWriteBytes, []string{service.Name}, service.WriteBytesTotal, 1},
 		} {
 			value, err := strconv.ParseFloat(strings.TrimSpace(sample.raw), 64)
 			value *= sample.scale
 			if err == nil && value >= 0 && !math.IsInf(value, 1) {
-				sample.metric.WithLabelValues(service.Name, sample.kind).Set(value)
+				sample.metric.WithLabelValues(sample.labels...).Set(value)
 			}
 		}
 	}
