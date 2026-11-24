@@ -77,16 +77,18 @@ func (c *completeRequest) Run(ctx *kong.Context) error {
 		rows.WriteByte('\n')
 	}
 
-	// Installed completion scripts expect 0 for file completion and 4 for
-	// command or flag completion.
-	directive := 0
+	const (
+		allowFileCompletion = 0
+		noFileCompletion    = 4
+	)
+	directive := allowFileCompletion
 	if trace.Error == nil {
 		node := selectedCommand(trace)
 		if node.Name == "help" {
 			node = ctx.Model.Node
 		}
 		if strings.HasPrefix(prefix, "-") {
-			directive = 4
+			directive = noFileCompletion
 			used := make(map[*kong.Flag]bool)
 			for _, path := range trace.Path {
 				used[path.Flag] = true
@@ -106,7 +108,7 @@ func (c *completeRequest) Run(ctx *kong.Context) error {
 				}
 			}
 		} else if len(node.Children) > 0 {
-			directive = 4
+			directive = noFileCompletion
 			for _, command := range node.Children {
 				if !command.Hidden {
 					writeCandidate(command.Name, command.Help)
