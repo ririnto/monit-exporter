@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-_monit_exporter_completion() {
+_monit-exporter_completion() {
     local current="${COMP_WORDS[COMP_CWORD]-}" candidate description
     COMPREPLY=()
     while IFS=$'\t' read -r candidate description; do
@@ -21,4 +21,4 @@ _monit_exporter_completion() {
         esac
     done < <("${COMP_WORDS[0]}" __COMPLETE_COMMAND__ "${COMP_WORDS[@]:1:COMP_CWORD-1}" "$current")
 }
-complete -F _monit_exporter_completion monit-exporter
+complete -F _monit-exporter_completion monit-exporter
