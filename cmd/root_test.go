@@ -11,9 +11,12 @@ import (
 	"net/url"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/klauspost/compress/zstd"
 )
 
 func TestCLI(t *testing.T) {
@@ -38,7 +41,7 @@ func TestCLI(t *testing.T) {
 			args: []string{"serve", "--help"},
 			want: []string{
 				"monit-exporter serve [flags]",
-				"--ignore-ssl",
+				"--ignore-ssl[=true|false]",
 				"--listen-address string", `(default "localhost:9388")`,
 				"--log-level string", `(default "info")`,
 				"--metrics-path string", `(default "/metrics")`,
@@ -172,18 +175,34 @@ func TestCLI(t *testing.T) {
 				if err != nil {
 					t.Fatalf("create metrics request: %v", err)
 				}
+				request.Header.Set("Accept", "text/plain;version=1.0.0")
+				request.Header.Set("Accept-Encoding", "zstd")
 				for {
 					response, err := http.DefaultClient.Do(request)
 					if err == nil {
 						defer func() {
 							_ = response.Body.Close()
 						}()
-						metrics, err := io.ReadAll(response.Body)
+						if contentType := response.Header.Get("Content-Type"); !strings.HasPrefix(contentType, "text/plain; version=0.0.4;") {
+							t.Fatalf("metrics content type = %q, want Prometheus text 0.0.4", contentType)
+						}
+						if encoding := response.Header.Get("Content-Encoding"); encoding != "zstd" {
+							t.Fatalf("metrics content encoding = %q, want zstd", encoding)
+						}
+						decoder, err := zstd.NewReader(response.Body)
+						if err != nil {
+							t.Fatalf("create metrics decoder: %v", err)
+						}
+						defer decoder.Close()
+						metrics, err := io.ReadAll(decoder)
 						if err != nil {
 							t.Fatalf("read metrics: %v", err)
 						}
 						if response.StatusCode != http.StatusOK || !strings.Contains(string(metrics), "monit_exporter_up "+test.wantUp+"\n") {
 							t.Fatalf("expected monit_exporter_up %s, metrics response status %d", test.wantUp, response.StatusCode)
+						}
+						if runtime.GOOS == "darwin" && strings.Contains(string(metrics), "\n# TYPE process_") {
+							t.Error("metrics include process metrics on macOS")
 						}
 						break
 					}
