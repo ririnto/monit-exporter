@@ -37,6 +37,26 @@ func TestCLI(t *testing.T) {
 			want: []string{"monit-exporter [command]", "Run the Monit Exporter server"},
 		},
 		{
+			name: "root short help",
+			args: []string{"-h", "serve"},
+			want: []string{"monit-exporter [command]", "Available Commands:"},
+		},
+		{
+			name: "serve short help",
+			args: []string{"serve", "-h"},
+			want: []string{"monit-exporter serve [flags]"},
+		},
+		{
+			name: "serve help topic",
+			args: []string{"help", "serve"},
+			want: []string{"monit-exporter serve [flags]", "Global Flags:"},
+		},
+		{
+			name: "unknown help topic",
+			args: []string{"help", "bogus"},
+			want: []string{"Unknown help topic", "monit-exporter [command]"},
+		},
+		{
 			name: "serve help",
 			args: []string{"serve", "--help"},
 			want: []string{
@@ -54,7 +74,46 @@ func TestCLI(t *testing.T) {
 			name:     "unknown flag",
 			args:     []string{"serve", "--unknown-flag"},
 			exitCode: 1,
-			want:     []string{"unknown flag: --unknown-flag"},
+			want:     []string{"unknown flag", "--unknown-flag"},
+		},
+		{
+			name:     "missing flag value",
+			args:     []string{"serve", "--monit-password"},
+			exitCode: 1,
+			want:     []string{"--monit-password", "flag needs an argument"},
+		},
+		{
+			name:     "invalid boolean",
+			args:     []string{"--monit-password=" + password, "serve", "--ignore-ssl=maybe"},
+			exitCode: 1,
+			want:     []string{"--ignore-ssl", "must be true or false"},
+		},
+		{
+			name:     "invalid log level",
+			args:     []string{"serve", "--log-level=invalid"},
+			exitCode: 1,
+			want:     []string{"failed to set log level", "invalid"},
+		},
+		{
+			name:     "explicit false help",
+			args:     []string{"serve", "-h=false", "--listen-address=127.0.0.1:65536"},
+			exitCode: 1,
+			want:     []string{"failed to start server", "invalid port"},
+		},
+		{
+			name: "completion help",
+			args: []string{"completion"},
+			want: []string{"monit-exporter completion [command]", "bash", "fish", "powershell", "zsh"},
+		},
+		{
+			name: "completion with descriptions",
+			args: []string{"__complete", "serve", "--monit-s"},
+			want: []string{"--monit-scrape-uri\tThe Monit status URL to scrape (XML format).\n:4\n"},
+		},
+		{
+			name: "completion without descriptions",
+			args: []string{"__completeNoDesc", "serve", "--monit-s"},
+			want: []string{"--monit-scrape-uri\n:4\n"},
 		},
 		{
 			name: "debug password",
@@ -96,13 +155,15 @@ func TestCLI(t *testing.T) {
 
 	t.Run("debug scrape URI credentials", func(t *testing.T) {
 		const (
+			authUser    = "monit-auth-test-user"
 			uriUser     = "monit-uri-test-user-1b92d4"
 			uriPassword = "monit-uri-test-password-5e78c2"
 			uriToken    = "monit-uri-test-token-9ac41f"
 			query       = "format=xml&token=" + uriToken
 		)
-		monit := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.RawQuery != query {
+		monit := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			user, authPassword, ok := r.BasicAuth()
+			if r.URL.RawQuery != query || !ok || user != authUser || authPassword != password {
 				http.Error(w, "unexpected Monit request", http.StatusBadRequest)
 				return
 			}
@@ -117,7 +178,7 @@ func TestCLI(t *testing.T) {
 		}))
 		defer monit.Close()
 		scrapeURI := url.URL{
-			Scheme: "http",
+			Scheme: "https",
 			Host:   monit.Listener.Addr().String(),
 			User:   url.UserPassword(uriUser, uriPassword),
 		}
@@ -125,12 +186,14 @@ func TestCLI(t *testing.T) {
 		for _, test := range []struct {
 			name      string
 			path      string
+			ignoreSSL string
 			wantUp    string
 			wantCause string
 		}{
-			{name: "success", path: "/_status", wantUp: "1"},
-			{name: "transport failure", path: "/abort", wantUp: "0", wantCause: "EOF"},
-			{name: "invalid URI", path: "/_status%zz", wantUp: "0", wantCause: "invalid URL escape"},
+			{name: "success", path: "/_status", ignoreSSL: "--ignore-ssl", wantUp: "1"},
+			{name: "TLS verification", path: "/_status", ignoreSSL: "--ignore-ssl=F", wantUp: "0", wantCause: "certificate"},
+			{name: "transport failure", path: "/abort", ignoreSSL: "--ignore-ssl=t", wantUp: "0", wantCause: "EOF"},
+			{name: "invalid URI", path: "/_status%zz", ignoreSSL: "--ignore-ssl=true", wantUp: "0", wantCause: "invalid URL escape"},
 		} {
 			t.Run(test.name, func(t *testing.T) {
 				listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -145,8 +208,9 @@ func TestCLI(t *testing.T) {
 				ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 				defer cancel()
 				var output bytes.Buffer
-				command := exec.CommandContext(ctx, binary, "serve", "--log-level", "debug",
-					"--listen-address", address, "--monit-scrape-uri", scrapeURI.String()+test.path+"?"+query)
+				command := exec.CommandContext(ctx, binary, "--listen-address", address, "serve", "--log-level=debug",
+					test.ignoreSSL, "--metrics-path", "/compat-metrics", "--monit-scrape-uri", scrapeURI.String()+test.path+"?"+query,
+					"--monit-user", authUser, "--monit-password="+password)
 				command.Stdout, command.Stderr = &output, &output
 				if err := command.Start(); err != nil {
 					t.Fatalf("start CLI: %v", err)
@@ -161,17 +225,18 @@ func TestCLI(t *testing.T) {
 						t.Errorf("CLI output does not contain the scrape failure cause %q", test.wantCause)
 					}
 					for field, value := range map[string]string{
-						"username":    uriUser,
-						"password":    uriPassword,
-						"query token": uriToken,
+						"URI username":        uriUser,
+						"URI password":        uriPassword,
+						"URI query token":     uriToken,
+						"basic auth password": password,
 					} {
 						if strings.Contains(output.String(), value) {
-							t.Errorf("CLI output contains the Monit scrape URI %s", field)
+							t.Errorf("CLI output contains the Monit %s", field)
 						}
 					}
 				}()
 
-				request, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+address+"/metrics", nil)
+				request, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+address+"/compat-metrics", nil)
 				if err != nil {
 					t.Fatalf("create metrics request: %v", err)
 				}

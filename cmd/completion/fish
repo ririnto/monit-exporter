@@ -1,0 +1,14 @@
+function __monit_exporter_completion
+    set -l words (commandline -opc)
+    set -l current (commandline -ct | string collect --allow-empty)
+    set -l entries (command $words[1] __COMPLETE_COMMAND__ $words[2..-1] "$current")
+    if test (count $entries) -eq 0
+        return
+    end
+    if test "$entries[-1]" = :0
+        __fish_complete_path "$current"
+    else if test (count $entries) -gt 1
+        printf '%s\n' $entries[1..-2]
+    end
+end
+complete -c monit-exporter -f -a '(__monit_exporter_completion)'

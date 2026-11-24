@@ -1,27 +1,10 @@
 package cmd
 
 import (
-	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
-
-func TestServeCmd_Help(t *testing.T) {
-	buf := new(bytes.Buffer)
-	RootCmd.SetOut(buf)
-	RootCmd.SetArgs([]string{"serve", "--help"})
-
-	err := serveCmd.Execute()
-	if err != nil {
-		t.Fatalf("ServeCmd execution failed with --help: %v", err)
-	}
-
-	output := buf.String()
-	if len(output) == 0 {
-		t.Errorf("Expected help output for serve command, got empty string")
-	}
-}
 
 func TestCommonLogHandler(t *testing.T) {
 	dummyHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

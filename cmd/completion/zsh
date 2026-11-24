@@ -1,0 +1,21 @@
+#compdef monit-exporter
+
+_monit_exporter_completion() {
+    local entry
+    local -a entries candidates
+    entries=("${(@f)$( "${words[1]}" __COMPLETE_COMMAND__ "${(@)words[2,CURRENT-1]}" "${words[CURRENT]}" )}")
+    for entry in "${entries[@]}"; do
+        case "$entry" in
+            :0) _files; return ;;
+            :*) ;;
+            *) candidates+=("${entry/$'\t'/:}") ;;
+        esac
+    done
+    _describe 'monit-exporter' candidates
+}
+
+if [[ "$ZSH_EVAL_CONTEXT" == *:file ]]; then
+    compdef _monit_exporter_completion monit-exporter
+else
+    _monit_exporter_completion "$@"
+fi
