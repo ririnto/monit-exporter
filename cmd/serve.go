@@ -47,11 +47,10 @@ var serveCmd = &cobra.Command{
 			LogLevel:       logLevel,
 		}
 		logrus.Debugf(
-			"Server configuration loaded: ListenAddress=%s, MetricsPath=%s, IgnoreSSL=%t, MonitScrapeURI=%s, MonitUser=%s, LogLevel=%s",
+			"Server configuration loaded: ListenAddress=%s, MetricsPath=%s, IgnoreSSL=%t, MonitUser=%s, LogLevel=%s",
 			cfg.ListenAddress,
 			cfg.MetricsPath,
 			cfg.IgnoreSSL,
-			cfg.MonitScrapeURI,
 			cfg.MonitUser,
 			cfg.LogLevel,
 		)
