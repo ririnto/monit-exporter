@@ -1,45 +1,37 @@
 package cmd
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/sirupsen/logrus"
 )
 
 func TestCommonLogHandler(t *testing.T) {
-	dummyHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("OK"))
-	})
-	handler := commonLogHandler(dummyHandler)
+	var logs bytes.Buffer
+	defer logrus.SetOutput(logrus.StandardLogger().Out)
+	logrus.SetOutput(&logs)
 
-	req := httptest.NewRequest("GET", "/dummy", nil)
-	w := httptest.NewRecorder()
+	const body = "OK"
+	handler := commonLogHandler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+		if n, err := w.Write([]byte(body)); n != len(body) || err != nil {
+			t.Errorf("Write returned (%d, %v), want (%d, nil)", n, err, len(body))
+		}
+	}))
 
-	handler.ServeHTTP(w, req)
-	if w.Result().StatusCode != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", w.Result().StatusCode)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/dummy", nil))
+	if got := response.Result().StatusCode; got != http.StatusAccepted {
+		t.Errorf("HTTP status = %d, want %d", got, http.StatusAccepted)
 	}
-}
-
-func TestNewLoggingResponseWriter(t *testing.T) {
-	rec := httptest.NewRecorder()
-	lrw := NewLoggingResponseWriter(rec)
-	lrw.WriteHeader(http.StatusAccepted)
-
-	if lrw.statusCode != http.StatusAccepted {
-		t.Errorf("Expected status code 202, got %d", lrw.statusCode)
+	if got := response.Body.String(); got != body {
+		t.Errorf("HTTP body = %q, want %q", got, body)
 	}
-
-	testData := []byte("Hello, World!")
-	n, err := lrw.Write(testData)
-	if err != nil {
-		t.Fatalf("Write failed: %v", err)
-	}
-	if n != len(testData) {
-		t.Errorf("Expected %d bytes, wrote %d", len(testData), n)
-	}
-	if lrw.size != len(testData) {
-		t.Errorf("Expected lrw.size=%d, got %d", len(testData), lrw.size)
+	if got := logs.String(); !strings.Contains(got, " 202 2 ") {
+		t.Errorf("access log = %q, want status 202 and size 2", got)
 	}
 }
