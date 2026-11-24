@@ -1,3 +1,4 @@
+// Package exporter collects Monit service status and exposes it as Prometheus metrics.
 package exporter
 
 import (

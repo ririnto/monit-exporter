@@ -1,3 +1,4 @@
+// Package config defines exporter settings and configures logging.
 package config
 
 import (

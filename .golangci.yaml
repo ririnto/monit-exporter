@@ -1,0 +1,15 @@
+version: "2"
+
+linters:
+  enable:
+    - gocritic
+    - revive
+  settings:
+    gocritic:
+      enabled-checks:
+        - commentedOutCode
+        - commentedOutImport
+
+formatters:
+  enable:
+    - gofmt
