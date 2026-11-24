@@ -99,6 +99,27 @@ Older exporter releases could report Monit's HTML error page as an XML syntax er
 Use `/_status?format=xml&level=full` in `--monit-scrape-uri`.
 Without `format=xml`, Monit serves the status as plain text.
 
+### Upstream decisions
+
+- On Monit 5.25.3 and 5.26.0, omitting Basic Auth credentials reproduced the reported XML syntax error.
+  Monit returned an HTTP 401 HTML page, and the historical exporter tried to parse it as XML.
+  The fork documented the configuration error and added tests for scrape diagnostics.
+  The original report omitted the response and Monit version, so its cause remains unconfirmed.
+  [Upstream issue #8][upstream-issue-8], [Fork PR #13][fork-pr-13]
+- The fork added the `monit_service_process_pid` gauge for process services with a valid PID.
+  Monit polling gaps, Prometheus scrape gaps, and PID reuse can hide restarts.
+  [Upstream issue #9][upstream-issue-9], [Fork PR #14][fork-pr-14]
+- The fork implemented per-process CPU, memory, and disk-write metrics.
+  A series disappears when Monit omits its value or service, or when the scrape fails.
+  The upstream listen default change, metric renames, and release tooling fell outside that scope.
+  [Upstream PR #7][upstream-pr-7], [Fork PR #15][fork-pr-15]
+- The fork declined the PID patch because it can emit zero for a missing PID and emit PID series for non-process services.
+  The fork already uses `promhttp` and accepts only valid PIDs from process services.
+  [Upstream PR #10][upstream-pr-10], [Fork PR #14][fork-pr-14]
+- The fork declined the `config.toml` setup routine because the exporter reads configuration from command-line flags.
+  Adding setup for an unused file would introduce a second configuration interface without a demonstrated need.
+  [Upstream issue #12][upstream-issue-12]
+
 ### Running tests and lint
 
 Run the pull-request checks locally.
@@ -227,6 +248,27 @@ Monit이 HTTP 401을 반환하면 `--monit-user`와 `--monit-password`가 Monit 
 `--monit-scrape-uri`에는 `/_status?format=xml&level=full`을 사용하세요.
 `format=xml`을 생략하면 Monit은 상태를 일반 텍스트로 반환합니다.
 
+### 업스트림 항목에 대한 결정
+
+- Monit 5.25.3과 5.26.0에서 Basic Auth 인증 정보를 생략했을 때 보고된 XML 구문 오류가 재현되었습니다.
+  Monit은 HTTP 401 HTML 페이지를 반환했고, 이전 익스포터는 이 페이지를 XML로 파싱하려 했습니다.
+  포크는 설정 오류를 문서화하고 수집 오류 진단을 검증하는 테스트를 추가했습니다.
+  원래 보고에는 응답과 Monit 버전이 없어 정확한 원인은 확인되지 않았습니다.
+  [업스트림 이슈 #8][upstream-issue-8], [포크 PR #13][fork-pr-13]
+- 포크는 유효한 PID가 있는 프로세스 서비스를 위해 `monit_service_process_pid` 게이지를 추가했습니다.
+  Monit 폴링이나 Prometheus 스크레이프 사이에 발생한 재시작을 놓칠 수 있으며, PID 재사용도 관측에 영향을 줍니다.
+  [업스트림 이슈 #9][upstream-issue-9], [포크 PR #14][fork-pr-14]
+- 포크는 프로세스별 CPU, 메모리, 디스크 쓰기 메트릭을 구현했습니다.
+  Monit 응답에 값이나 서비스가 없거나 스크레이프에 실패하면 해당 시계열이 사라집니다.
+  업스트림 PR의 수신 주소 기본값 변경, 기존 메트릭 이름 변경, 릴리스 도구 추가는 이 범위에서 제외했습니다.
+  [업스트림 PR #7][upstream-pr-7], [포크 PR #15][fork-pr-15]
+- 업스트림 PID 패치는 PID가 없을 때 0을 노출하거나 프로세스가 아닌 서비스의 PID 시계열을 생성할 수 있어 채택하지 않았습니다.
+  포크는 이미 `promhttp`를 사용하며 프로세스 서비스의 유효한 PID만 노출합니다.
+  [업스트림 PR #10][upstream-pr-10], [포크 PR #14][fork-pr-14]
+- 익스포터는 커맨드라인 플래그로 설정을 읽으므로 포크는 `config.toml` 설정 절차를 도입하지 않기로 했습니다.
+  사용하지 않는 파일의 설정 절차를 추가하면 필요성이 확인되지 않은 두 번째 설정 인터페이스가 생깁니다.
+  [업스트림 이슈 #12][upstream-issue-12]
+
 ### 테스트 및 린트 실행
 
 풀 리퀘스트와 동일한 검사를 로컬에서 실행합니다.
@@ -258,3 +300,12 @@ go tool -modfile=lint.mod golangci-lint run --config .golangci.yaml ./...
 ### 라이선스
 
 이 프로젝트는 [MIT License](LICENSE)에 따라 라이선스가 부여됩니다.
+
+[upstream-issue-8]: https://github.com/commercetools/monit_exporter/issues/8
+[upstream-issue-9]: https://github.com/commercetools/monit_exporter/issues/9
+[upstream-pr-7]: https://github.com/commercetools/monit_exporter/pull/7
+[upstream-pr-10]: https://github.com/commercetools/monit_exporter/pull/10
+[upstream-issue-12]: https://github.com/commercetools/monit_exporter/issues/12
+[fork-pr-13]: https://github.com/ririnto/monit-exporter/pull/13
+[fork-pr-14]: https://github.com/ririnto/monit-exporter/pull/14
+[fork-pr-15]: https://github.com/ririnto/monit-exporter/pull/15
