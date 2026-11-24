@@ -5,8 +5,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/ririnto/monit-exporter/internal/config"
 	"github.com/sirupsen/logrus"
@@ -79,6 +82,77 @@ monit_exporter_service_check{service_monitor_status="1",service_name="rootfs",se
 monit_exporter_up 1
 `)); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestExporter_ScrapeProcessPID(t *testing.T) {
+	var services atomic.Pointer[string]
+	monitServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprintf(w, `<monit><server><version>5.26.0</version></server>%s</monit>`, *services.Load())
+	}))
+	defer monitServer.Close()
+
+	exp, err := NewExporter(&config.Config{MonitScrapeURI: monitServer.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry := prometheus.NewPedanticRegistry()
+	registry.MustRegister(exp)
+	metricsServer := httptest.NewServer(promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
+	defer metricsServer.Close()
+
+	for _, scrape := range []struct {
+		name     string
+		services string
+		pid      int
+	}{
+		{
+			name: "reports only valid process PIDs",
+			services: `
+<service type="3"><name>worker</name><monitor>1</monitor><pid> 42 </pid></service>
+<service type="3"><name>empty</name><pid/></service>
+<service type="3"><name>zero</name><pid>0</pid></service>
+<service type="3"><name>negative</name><pid>-1</pid></service>
+<service type="3"><name>nonnumeric</name><pid>unknown</pid></service>
+<service type="3"><name>out-of-range</name><pid>2147483648</pid></service>
+<service type="0"><name>rootfs</name><pid>73</pid></service>`,
+			pid: 42,
+		},
+		{
+			name:     "updates PID in the same series when monitor status changes",
+			services: `<service type="3"><name>worker</name><monitor>2</monitor><pid>57</pid></service>`,
+			pid:      57,
+		},
+		{
+			name:     "removes PID when Monit omits it",
+			services: `<service type="3"><name>worker</name><monitor>1</monitor></service>`,
+		},
+		{
+			name:     "reports PID again when available",
+			services: `<service type="3"><name>worker</name><monitor>1</monitor><pid>81</pid></service>`,
+			pid:      81,
+		},
+		{name: "removes PID when the service disappears"},
+	} {
+		t.Run(scrape.name, func(t *testing.T) {
+			services.Store(&scrape.services)
+			expected := `
+# HELP monit_exporter_up Indicates whether the Monit endpoint is reachable (1) or not (0).
+# TYPE monit_exporter_up gauge
+monit_exporter_up 1
+`
+			if scrape.pid > 0 {
+				expected += fmt.Sprintf(`
+# HELP monit_service_process_pid Process ID reported by Monit.
+# TYPE monit_service_process_pid gauge
+monit_service_process_pid{service_name="worker"} %d
+`, scrape.pid)
+			}
+			if err := testutil.ScrapeAndCompare(metricsServer.URL+"/metrics", strings.NewReader(expected),
+				"monit_exporter_up", "monit_service_process_pid"); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 
