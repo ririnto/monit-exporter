@@ -201,7 +201,7 @@ Use focused synthetic cases for failure and boundary values. Exclude credentials
   `promhttp_metric_handler_requests_total` counts completed scrapes by `code` (HTTP status), and `promhttp_metric_handler_requests_in_flight` gauges current scrapes without labels. [HTTP server](cmd/serve.go), [Prometheus handler instrumentation][inventory-prom-handler]
 - Synchronous collection and the upstream reachability gauge follow Prometheus exporter guidance. The collector serializes requests around mutable gauges and resets them each time. Prometheus recommends const metrics for custom collectors to handle concurrent scrapes and disappearing series. For new families, use base units, ratios for fractions, bounded labels, and `_total` for suitable counters. Review overlaps with node exporter for system and filesystem stats. [Prometheus exporter guidance][inventory-prom-exporters], [metric and label naming][inventory-prom-naming]
 - The [Taskfile](Taskfile.yaml) provides build, test, and lint commands. [Pull request CI](.github/workflows/test.yaml) runs the Go suite and pinned `golangci-lint`. Tests use `httptest`, Prometheus exposition comparisons, and a built CLI subprocess. [Go test command][inventory-go-test], [Prometheus exposition formats][inventory-prom-formats]
-- The [release workflow](.github/workflows/deploy.yaml) runs on `v*` tag pushes. It builds with `CGO_ENABLED=0` for Linux, macOS, and Windows on `amd64` and `arm64`, then uploads `monit-exporter-<goos>-<goarch>` with `.exe` on Windows. The tag filter and OS/architecture matrix define the trigger and artifact set. [GitHub Actions workflow syntax][inventory-actions]
+- The [release workflow](.github/workflows/deploy.yaml) runs GoReleaser on `v*` tag pushes. The [GoReleaser configuration](.goreleaser.yaml) builds with `CGO_ENABLED=0` for Linux, macOS, and Windows on `amd64` and `arm64`. [GitHub Actions workflow syntax][inventory-actions]
 
 #### Follow-up pull requests
 
@@ -267,6 +267,23 @@ Run the pull-request checks locally.
 go test ./...
 go tool -modfile=lint.mod golangci-lint run --config .golangci.yaml ./...
 ```
+
+### Building a release snapshot
+
+Install [GoReleaser v2.20.3][goreleaser-version], the version pinned in the release workflow, and run both commands in the repository root.
+
+```bash
+goreleaser check
+goreleaser release --snapshot --clean
+```
+
+The snapshot writes raw binaries under `dist/`.
+In `dist/artifacts.json`, a release asset's `name` is the download filename, such as `monit-exporter-linux-amd64` or `monit-exporter-windows-arm64.exe`.
+Use its `path` to find the local executable.
+Snapshot mode skips publication and needs no new tag or GitHub token.
+To publish, the release workflow runs on a pushed semantic-version tag such as `v1.2.3`.
+
+[goreleaser-version]: https://github.com/goreleaser/goreleaser/releases/tag/v2.20.3
 
 ### Project / Package Structure
 
@@ -416,6 +433,21 @@ Monit이 HTTP 401을 반환하면 `--monit-user`와 `--monit-password`가 Monit 
 go test ./...
 go tool -modfile=lint.mod golangci-lint run --config .golangci.yaml ./...
 ```
+
+### 릴리스 스냅샷 빌드
+
+릴리스 워크플로와 같은 [GoReleaser v2.20.3][goreleaser-version]을 설치하고 저장소 루트에서 두 명령을 실행합니다.
+
+```bash
+goreleaser check
+goreleaser release --snapshot --clean
+```
+
+스냅샷은 `dist/` 아래에 실행 파일을 생성합니다.
+`dist/artifacts.json`에서 각 릴리스 에셋의 `name`은 `monit-exporter-linux-amd64` 또는 `monit-exporter-windows-arm64.exe`와 같은 다운로드 파일 이름입니다.
+로컬 실행 파일의 위치는 `path`에서 확인할 수 있습니다.
+스냅샷은 게시하지 않으며 새 태그나 GitHub 토큰이 필요하지 않습니다.
+릴리스 워크플로는 `v1.2.3`과 같은 시맨틱 버전 태그를 푸시할 때 실행됩니다.
 
 ### 프로젝트 / 패키지 구조
 

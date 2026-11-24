@@ -1,0 +1,18 @@
+version: 2
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: [-s -w]
+
+archives:
+  - formats: [binary]
+    name_template: 'monit-exporter-{{ .Os }}-{{ .Arch }}'
+
+checksum:
+  disable: true
+
+changelog:
+  disable: true
