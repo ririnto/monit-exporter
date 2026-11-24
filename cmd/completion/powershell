@@ -1,0 +1,27 @@
+Register-ArgumentCompleter -Native -CommandName 'monit-exporter' -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
+
+    $elements = $commandAst.CommandElements
+    $arguments = foreach ($element in ($elements | Select-Object -Skip 1)) {
+        if ($element.Extent.EndOffset -ge $cursorPosition) {
+            break
+        }
+        if ($element -is [System.Management.Automation.Language.StringConstantExpressionAst]) {
+            $element.Value
+        } else {
+            $element.Extent.Text
+        }
+    }
+    if (-not $wordToComplete -and ($PSVersionTable.PSVersion -lt '7.3' -or $PSNativeCommandArgumentPassing -eq 'Legacy')) {
+        $wordToComplete = '""'
+    }
+    & $elements[0].Value __COMPLETE_COMMAND__ @arguments $wordToComplete | ForEach-Object {
+        if ($_ -and -not $_.StartsWith(':')) {
+            $value, $description = $_ -split "`t", 2
+            if (-not $description) {
+                $description = $value
+            }
+            [System.Management.Automation.CompletionResult]::new($value, $value, 'ParameterValue', $description)
+        }
+    }
+}

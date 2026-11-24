@@ -22,104 +22,102 @@ import (
 	"github.com/ririnto/monit-exporter/internal/config"
 	"github.com/ririnto/monit-exporter/internal/exporter"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 )
 
 //go:embed static/favicon.ico
 var embeddedFavicon []byte
 
-var serveCmd = &cobra.Command{
-	Use:   "serve",
-	Short: "Run the Monit Exporter server",
-	Long:  "Run the Monit Exporter server that collects Monit status and exposes Prometheus metrics.",
-	RunE: func(*cobra.Command, []string) error {
-		logrus.Debug("serveCmd invoked: starting Monit Exporter server")
-
-		if err := config.SetLogLevel(logLevel); err != nil {
-			logrus.Errorf("Failed to set log level: %v", err)
-			return fmt.Errorf("failed to set log level: %w", err)
-		}
-		logrus.Debugf("Log level set to '%s'", logLevel)
-
-		cfg := &config.Config{
-			ListenAddress:  listenAddress,
-			MetricsPath:    metricsPath,
-			IgnoreSSL:      ignoreSSL,
-			MonitScrapeURI: monitScrapeURI,
-			MonitUser:      monitUser,
-			MonitPassword:  monitPassword,
-			LogLevel:       logLevel,
-		}
-		logrus.Debugf(
-			"Server configuration loaded: ListenAddress=%s, MetricsPath=%s, IgnoreSSL=%t, MonitUser=%s, LogLevel=%s",
-			cfg.ListenAddress,
-			cfg.MetricsPath,
-			cfg.IgnoreSSL,
-			cfg.MonitUser,
-			cfg.LogLevel,
-		)
-
-		exp, err := exporter.NewExporter(cfg)
-		if err != nil {
-			logrus.Errorf("Failed to create exporter: %v", err)
-			return fmt.Errorf("failed to create exporter: %w", err)
-		}
-		logrus.Debug("Registering exporter to Prometheus")
-		registry := prometheus.NewRegistry()
-		registry.MustRegister(exp, collectors.NewGoCollector())
-		if runtime.GOOS != "darwin" {
-			registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
-		}
-
-		mux := http.NewServeMux()
-		mux.Handle(cfg.MetricsPath, promhttp.InstrumentMetricHandler(registry, promhttp.HandlerFor(registry, promhttp.HandlerOpts{
-			AcceptedFormats: []expfmt.Format{expfmt.FmtText, expfmt.FmtProtoDelim, expfmt.FmtProtoText, expfmt.FmtProtoCompact},
-		})))
-		mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
-			if 0 < len(embeddedFavicon) {
-				w.Header().Set("Content-Type", "image/x-icon")
-				_, _ = w.Write(embeddedFavicon)
-			} else {
-				http.ServeFile(w, r, filepath.Join("static", "favicon.ico"))
-			}
-		})
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			logrus.Debugf("Root path request received from %s", r.RemoteAddr)
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			_, _ = fmt.Fprintf(
-				w,
-				`<html><head><title>Monit Exporter</title></head><body><h1>Monit Exporter</h1><p><a href="%s">Metrics</a></p></body></html>`,
-				cfg.MetricsPath,
-			)
-		})
-
-		server := &http.Server{Addr: cfg.ListenAddress, Handler: commonLogHandler(mux)}
-		shutdownCh := make(chan os.Signal, 1)
-		signal.Notify(shutdownCh, os.Interrupt, syscall.SIGTERM)
-		go func() {
-			sig := <-shutdownCh
-			logrus.Infof("Received shutdown signal: %v. Attempting to stop Monit Exporter gracefully...", sig)
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := server.Shutdown(ctx); err != nil {
-				logrus.Errorf("Graceful shutdown failed: %v", err)
-			} else {
-				logrus.Info("Server shut down gracefully")
-			}
-		}()
-
-		logrus.Infof("Starting Monit Exporter on %s", cfg.ListenAddress)
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logrus.Errorf("Failed to start server: %v", err)
-			return fmt.Errorf("failed to start server: %w", err)
-		}
-		logrus.Info("Monit Exporter stopped")
-		return nil
-	},
+type serveCommand struct {
+	Args []string `arg:"" hidden:"" optional:"" sep:"none"`
 }
 
-func init() {
-	RootCmd.AddCommand(serveCmd)
+func (serveCommand) Help() string {
+	return "Run the Monit Exporter server that collects Monit status and exposes Prometheus metrics."
+}
+
+func (serveCommand) Run(cli *commandLine) error {
+	logrus.Debug("Starting Monit Exporter server")
+
+	if err := config.SetLogLevel(cli.LogLevel); err != nil {
+		logrus.Errorf("Failed to set log level: %v", err)
+		return fmt.Errorf("failed to set log level: %w", err)
+	}
+	logrus.Debugf("Log level set to '%s'", cli.LogLevel)
+
+	cfg := &config.Config{
+		ListenAddress:  cli.ListenAddress,
+		MetricsPath:    cli.MetricsPath,
+		IgnoreSSL:      bool(cli.IgnoreSSL),
+		MonitScrapeURI: cli.MonitScrapeURI,
+		MonitUser:      cli.MonitUser,
+		MonitPassword:  cli.MonitPassword,
+		LogLevel:       cli.LogLevel,
+	}
+	logrus.Debugf(
+		"Server configuration loaded: ListenAddress=%s, MetricsPath=%s, IgnoreSSL=%t, MonitUser=%s, LogLevel=%s",
+		cfg.ListenAddress,
+		cfg.MetricsPath,
+		cfg.IgnoreSSL,
+		cfg.MonitUser,
+		cfg.LogLevel,
+	)
+
+	exp, err := exporter.NewExporter(cfg)
+	if err != nil {
+		logrus.Errorf("Failed to create exporter: %v", err)
+		return fmt.Errorf("failed to create exporter: %w", err)
+	}
+	logrus.Debug("Registering exporter to Prometheus")
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(exp, collectors.NewGoCollector())
+	if runtime.GOOS != "darwin" {
+		registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle(cfg.MetricsPath, promhttp.InstrumentMetricHandler(registry, promhttp.HandlerFor(registry, promhttp.HandlerOpts{
+		AcceptedFormats: []expfmt.Format{expfmt.FmtText, expfmt.FmtProtoDelim, expfmt.FmtProtoText, expfmt.FmtProtoCompact},
+	})))
+	mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		if 0 < len(embeddedFavicon) {
+			w.Header().Set("Content-Type", "image/x-icon")
+			_, _ = w.Write(embeddedFavicon)
+		} else {
+			http.ServeFile(w, r, filepath.Join("static", "favicon.ico"))
+		}
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		logrus.Debugf("Root path request received from %s", r.RemoteAddr)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = fmt.Fprintf(
+			w,
+			`<html><head><title>Monit Exporter</title></head><body><h1>Monit Exporter</h1><p><a href="%s">Metrics</a></p></body></html>`,
+			cfg.MetricsPath,
+		)
+	})
+
+	server := &http.Server{Addr: cfg.ListenAddress, Handler: commonLogHandler(mux)}
+	shutdownCh := make(chan os.Signal, 1)
+	signal.Notify(shutdownCh, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		sig := <-shutdownCh
+		logrus.Infof("Received shutdown signal: %v. Attempting to stop Monit Exporter gracefully...", sig)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(ctx); err != nil {
+			logrus.Errorf("Graceful shutdown failed: %v", err)
+		} else {
+			logrus.Info("Server shut down gracefully")
+		}
+	}()
+
+	logrus.Infof("Starting Monit Exporter on %s", cfg.ListenAddress)
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		logrus.Errorf("Failed to start server: %v", err)
+		return fmt.Errorf("failed to start server: %w", err)
+	}
+	logrus.Info("Monit Exporter stopped")
+	return nil
 }
 
 // LoggingResponseWriter wraps a http.ResponseWriter to track status code and size.
