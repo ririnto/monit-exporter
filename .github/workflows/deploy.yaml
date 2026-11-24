@@ -10,37 +10,26 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        goos: [ linux, darwin, windows ]
-        goarch: [ amd64, arm64 ]
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v7.1.0
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      - name: Build binary
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-        run: |
-          mkdir -p build
-          if [ "${GOOS}" = "windows" ]; then
-            BINARY_NAME=monit-exporter-${GOOS}-${GOARCH}.exe
-          else
-            BINARY_NAME=monit-exporter-${GOOS}-${GOARCH}
-          fi
-          CGO_ENABLED=0 go build -ldflags="-s -w" -o build/${BINARY_NAME}
-
-      - name: Upload binaries to GitHub Releases
-        uses: softprops/action-gh-release@v1
+      - name: Build and publish release binaries
+        uses: goreleaser/goreleaser-action@v7.3.0
         with:
-          files: build/monit-exporter-*
+          version: v2.20.3
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
