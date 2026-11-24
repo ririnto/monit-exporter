@@ -68,19 +68,41 @@ func TestFetchMonitStatus_Success(t *testing.T) {
 	}
 }
 
-// TestFetchMonitStatus_Non2xx checks if FetchMonitStatus returns an error on 400 status code.
 func TestFetchMonitStatus_Non2xx(t *testing.T) {
-	t.Log("Testing FetchMonitStatus with a mock server returning 400 status")
+	t.Parallel()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		http.Error(w, "some error", http.StatusBadRequest)
-	}))
-	defer server.Close()
+	for _, test := range []struct {
+		name        string
+		status      int
+		contentType string
+		body        string
+	}{
+		{name: "bad request", status: http.StatusBadRequest, contentType: "text/plain", body: "Bad Request"},
+		{
+			name:        "Monit authentication error",
+			status:      http.StatusUnauthorized,
+			contentType: "text/html",
+			body:        "<html><head><title>401 Unauthorized</title></head><body bgcolor=#FFFFFF><h2>Unauthorized</h2></body></html>",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 
-	cfg := &config.Config{MonitScrapeURI: server.URL}
-	_, err := FetchMonitStatus(cfg)
-	if err == nil {
-		t.Fatal("Expected an error for HTTP 400 status, got nil")
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", test.contentType)
+				w.WriteHeader(test.status)
+				_, _ = fmt.Fprint(w, test.body)
+			}))
+			defer server.Close()
+
+			data, err := FetchMonitStatus(&config.Config{MonitScrapeURI: server.URL})
+			if want := fmt.Sprintf("monit returned non-2xx status code: %d", test.status); err == nil || err.Error() != want {
+				t.Fatalf("expected %q, got %v", want, err)
+			}
+			if len(data) != 0 {
+				t.Errorf("expected no status data, got %d bytes", len(data))
+			}
+		})
 	}
 }
 
@@ -102,13 +124,32 @@ func TestParseMonitStatus_Success(t *testing.T) {
 	}
 }
 
-// TestParseMonitStatus_Error verifies error handling for malformed XML.
 func TestParseMonitStatus_Error(t *testing.T) {
-	t.Log("Testing ParseMonitStatus with malformed XML string")
+	t.Parallel()
 
-	invalidXML := `<monit><server>missing closing tags`
-	_, err := ParseMonitStatus([]byte(invalidXML))
-	if err == nil {
-		t.Fatal("Expected an XML parse error, got nil")
+	for _, test := range []struct {
+		name      string
+		body      string
+		wantError string
+	}{
+		{
+			name:      "truncated XML",
+			body:      "<monit><server>missing closing tags",
+			wantError: "failed to parse Monit XML: XML syntax error on line 1: unexpected EOF",
+		},
+		{
+			name:      "plain-text status",
+			body:      "Monit 5.25.3 uptime: 1m\n\nSystem 'status-probe'\n",
+			wantError: "failed to parse Monit XML: EOF",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := ParseMonitStatus([]byte(test.body))
+			if err == nil || err.Error() != test.wantError {
+				t.Errorf("expected %q, got %v", test.wantError, err)
+			}
+		})
 	}
 }
