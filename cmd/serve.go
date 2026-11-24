@@ -8,13 +8,17 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"time"
 
 	_ "embed"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	_ "github.com/prometheus/client_golang/prometheus/promhttp/zstd" // Enable zstd negotiation for the metrics endpoint.
+	"github.com/prometheus/common/expfmt"
 	"github.com/ririnto/monit-exporter/internal/config"
 	"github.com/ririnto/monit-exporter/internal/exporter"
 	"github.com/sirupsen/logrus"
@@ -61,10 +65,16 @@ var serveCmd = &cobra.Command{
 			return fmt.Errorf("failed to create exporter: %w", err)
 		}
 		logrus.Debug("Registering exporter to Prometheus")
-		prometheus.MustRegister(exp)
+		registry := prometheus.NewRegistry()
+		registry.MustRegister(exp, collectors.NewGoCollector())
+		if runtime.GOOS != "darwin" {
+			registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+		}
 
 		mux := http.NewServeMux()
-		mux.Handle(cfg.MetricsPath, promhttp.Handler())
+		mux.Handle(cfg.MetricsPath, promhttp.InstrumentMetricHandler(registry, promhttp.HandlerFor(registry, promhttp.HandlerOpts{
+			AcceptedFormats: []expfmt.Format{expfmt.FmtText, expfmt.FmtProtoDelim, expfmt.FmtProtoText, expfmt.FmtProtoCompact},
+		})))
 		mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
 			if 0 < len(embeddedFavicon) {
 				w.Header().Set("Content-Type", "image/x-icon")
