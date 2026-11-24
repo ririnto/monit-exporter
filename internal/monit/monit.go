@@ -188,7 +188,7 @@ type Errors struct {
 
 // FetchMonitStatus sends an HTTP GET request to the Monit endpoint and returns the response body.
 func FetchMonitStatus(cfg *config.Config) ([]byte, error) {
-	logrus.Debugf("FetchMonitStatus: MonitScrapeURI=%s, IgnoreSSL=%t", cfg.MonitScrapeURI, cfg.IgnoreSSL)
+	logrus.Debugf("FetchMonitStatus: IgnoreSSL=%t", cfg.IgnoreSSL)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

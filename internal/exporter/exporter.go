@@ -74,8 +74,7 @@ func NewExporter(cfg *config.Config) (*Exporter, error) {
 		return nil, ErrNilConfig
 	}
 
-	logrus.Debugf("NewExporter: creating exporter with ListenAddress=%s, MonitScrapeURI=%s",
-		cfg.ListenAddress, cfg.MonitScrapeURI)
+	logrus.Debugf("NewExporter: creating exporter with ListenAddress=%s", cfg.ListenAddress)
 
 	labelNames := []string{"service_name", "service_type", "service_monitor_status"}
 
