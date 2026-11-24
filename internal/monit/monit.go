@@ -1,3 +1,4 @@
+// Package monit fetches and parses Monit status reports.
 package monit
 
 import (

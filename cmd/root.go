@@ -1,3 +1,4 @@
+// Package cmd defines the Monit Exporter command-line interface.
 package cmd
 
 import (
@@ -23,7 +24,7 @@ var RootCmd = &cobra.Command{
 	Use:   "monit-exporter",
 	Short: "Monit Exporter for Prometheus",
 	Long:  "Prometheus Exporter that collects Monit status information and exposes metrics.",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		logrus.Debug("RootCmd is running without subcommand, displaying help message")
 		return cmd.Help()
 	},

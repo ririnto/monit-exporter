@@ -1,3 +1,4 @@
+// Monit Exporter exposes Monit status as Prometheus metrics.
 package main
 
 import (

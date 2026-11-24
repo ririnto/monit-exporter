@@ -84,7 +84,7 @@ monit_exporter_up 1
 
 // TestExporter_Collect_MonitError uses a mock server that returns an HTTP error.
 func TestExporter_Collect_MonitError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "some error", http.StatusBadRequest)
 	}))
 	defer server.Close()

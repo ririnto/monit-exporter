@@ -14,7 +14,7 @@ func TestFetchMonitStatus_Success(t *testing.T) {
 	t.Log("Testing FetchMonitStatus with a mock server providing valid XML")
 
 	mockXML := `<?xml version="1.0"?><monit><server><version>5.26.0</version></server></monit>`
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = fmt.Fprint(w, mockXML)
 	}))
 	defer server.Close()
@@ -33,7 +33,7 @@ func TestFetchMonitStatus_Success(t *testing.T) {
 func TestFetchMonitStatus_Non2xx(t *testing.T) {
 	t.Log("Testing FetchMonitStatus with a mock server returning 400 status")
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "some error", http.StatusBadRequest)
 	}))
 	defer server.Close()

@@ -69,16 +69,14 @@ Below is an overview of the flags defined in `cmd/root.go`:
 curl http://localhost:9388/metrics
 ```
 
-### Running Tests
+### Running tests and lint
 
-To run the unit tests for the exporter and Monit components:
+Run the pull-request checks locally.
 
 ```bash
-go test ./internal/exporter -v
-go test ./internal/monit -v
+go test ./...
+go tool -modfile=lint.mod golangci-lint run --config .golangci.yaml ./...
 ```
-
-Ensure that all tests pass to verify the integrity of the exporter before deployment.
 
 ### Project / Package Structure
 
@@ -169,16 +167,14 @@ Monit Exporter는 Monit 상태 정보를 XML 형식으로 수집하고 이를 Pr
 curl http://localhost:9388/metrics
 ```
 
-### 테스트 실행
+### 테스트 및 린트 실행
 
-익스포터 및 Monit 컴포넌트의 단위 테스트를 실행하려면:
+풀 리퀘스트와 동일한 검사를 로컬에서 실행합니다.
 
 ```bash
-go test ./internal/exporter -v
-go test ./internal/monit -v
+go test ./...
+go tool -modfile=lint.mod golangci-lint run --config .golangci.yaml ./...
 ```
-
-모든 테스트를 통과시켜 익스포터의 무결성을 검증한 후 배포하십시오.
 
 ### 프로젝트 / 패키지 구조
 

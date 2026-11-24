@@ -28,7 +28,7 @@ var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Run the Monit Exporter server",
 	Long:  "Run the Monit Exporter server that collects Monit status and exposes Prometheus metrics.",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(*cobra.Command, []string) error {
 		logrus.Debug("serveCmd invoked: starting Monit Exporter server")
 
 		if err := config.SetLogLevel(logLevel); err != nil {
